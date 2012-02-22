@@ -406,6 +406,7 @@ void Framework::Go()
 
 void Framework::Exit()
 {
+    exit(0);
     exitSignal = true;
     if (application)
         application->AboutToExit();
