@@ -46,23 +46,29 @@ function OnFrameUpdate()
             pendingTransfers.push(url);
         }
     }
-    
+
+   if (frame.FrameNumber() > 10 && pendingTransfers.length == 0)
+      framework.Exit();
+
     var newPendingTransfers = ArrayDiff(pendingTransfers, prevPendingTransfers);
     var completedTransfers = ArrayDiff(prevPendingTransfers, pendingTransfers);        
     prevPendingTransfers = pendingTransfers;
     if (newPendingTransfers.length > 0 || completedTransfers.length > 0)
     {
         numAssetsLoaded += completedTransfers.length;
-        
+
         mostRecentCompletedTransfers = mostRecentCompletedTransfers.concat(completedTransfers);
         var numTransfersToShow = 3;
         if (mostRecentCompletedTransfers.length > numTransfersToShow)
             mostRecentCompletedTransfers.splice(0, mostRecentCompletedTransfers.length - numTransfersToShow);
-           
+
         proxy.x = ui.GraphicsView().width/2 - 250;
         proxy.y = ui.GraphicsView().height/2 - 40;        
         if (pendingTransfers.length == 0)
+        {
+            framework.Exit(0);
             label.text = "Done.";
+        }
         else
             label.text = "Loading " + (numAssetsLoaded) + "/" + (numAssetsLoaded + pendingTransfers.length) + "...";
 
