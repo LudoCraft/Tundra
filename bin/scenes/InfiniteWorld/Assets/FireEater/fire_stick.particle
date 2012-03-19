@@ -1,0 +1,81 @@
+
+dust
+{
+	quota	200
+	material	fire.material
+	particle_width	0.1
+	particle_height	0.1
+	cull_each	false
+	renderer	billboard
+	sorted	false
+	local_space	true
+	iteration_interval	0
+	nonvisible_update_timeout	0
+	billboard_type	point
+	billboard_origin	center
+	billboard_rotation_type	vertex
+	common_up_vector	0 0 1
+	point_rendering	false
+	accurate_facing	false
+
+	emitter Point
+	{
+		angle	5
+		colour	0.2 0.2 0.2 1
+		colour_range_start	0 0 0 0
+		colour_range_end	1 1 1 0
+		direction	0 1 0
+		emission_rate	5
+		position	0 0 0
+		velocity	0
+		velocity_min	0.2
+		velocity_max    0.3
+		time_to_live	7
+		time_to_live_min	1
+		time_to_live_max	1
+		duration	0
+		duration_min	0
+		duration_max	0
+		repeat_delay	0
+		repeat_delay_min	0
+		repeat_delay_max	0
+	}
+
+	affector Rotator
+	{
+		rotation_speed_range_start	5
+		rotation_speed_range_end	50
+		rotation_range_start	0
+		rotation_range_end	180
+	}
+
+	affector Scaler
+	{
+		rate	0.05
+	}
+	affector LinearForce
+	{
+		force_vector	0.0 0.2 0
+		force_application	add
+	}
+	affector ColourInterpolator
+	{
+		colour0	0.2 0.2 0.3 0
+		time0	0
+		colour1	0.3 0.4 0.6 0.0
+		time1	0.05
+		colour2	0.4 0.78 0.98 0.8
+		time2	0.4
+		colour3	0.34902 0.64902 0.94902 0.6
+		time3	0.6
+		colour4	0.8 0.8 0.8 0.2
+		time4	0.8
+		colour5	0.2 0.2 0.3 0.0
+		time5	1
+	}
+	affector DirectionRandomiser
+	{
+	         randomness 0.5
+	}
+}
+

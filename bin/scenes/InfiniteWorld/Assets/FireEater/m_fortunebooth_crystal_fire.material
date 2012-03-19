@@ -1,0 +1,42 @@
+material m_fortunebooth_crystal_fire
+{
+	receive_shadows off
+	technique
+	{
+                pass crystal_ball
+		{
+		     diffuse 0.4 0.4 0.4 0.5
+		     emissive 1 1 1.0 1.0
+		     scene_blend alpha_blend
+		     depth_write off
+		     texture_unit
+		     {
+		             texture fortune_crystal_in.dds
+	             	     tex_address_mode wrap
+                             filtering trilinear
+                             scroll 0.55 0.0
+                             scroll_anim -0.15 0.1
+                      }
+                }
+		pass pic
+		{
+			ambient 1.000000 1.000000 1.000000 1.000000
+			diffuse 0.2000 .2 0.20000 1.000000
+			specular 0.621951 0.621951 0.621951 1.000000 14.500000
+			emissive 1.000 0.8 0.5000 1.000000
+			scene_blend alpha_blend
+			depth_write off
+			texture_unit
+			{
+				texture fortune_fire.dds
+				tex_address_mode wrap
+				filtering trilinear
+				scroll 0 0.0
+				scroll_anim 0.2 0.0
+				scale 0.5 1
+			}
+
+		}
+
+	}
+}
