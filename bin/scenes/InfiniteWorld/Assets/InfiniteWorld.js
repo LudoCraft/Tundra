@@ -246,7 +246,7 @@ function TopCenterBlock() { return sceneBlocks[0][(numCols-1)/2]; }
 function CenterLeftBlock() { return sceneBlocks[(numRows-1)/2][0]; }
 
 var timer = 0;
-var checkInterval = 2; // in seconds
+var checkInterval = 0; // in seconds
 
 function Update(frameTime)
 {
@@ -279,12 +279,11 @@ function Update(frameTime)
             Log("WAS:")
             DebugDumpSceneBlocks();
         }
-        
+
         var oldBlocks = [], newBlocks = [];
         var deltaRow = currentBlock.row - previousBlock.row;
         var deltaCol = currentBlock.col - previousBlock.col;
-        Log("Prev " + previousBlock);
-        Log("Curr " + currentBlock);
+        Log("Prev " + previousBlock + " Curr " + currentBlock);
         Log("deltaRow " + deltaRow + " deltaCol " + deltaCol);
         if (deltaRow == 0 && deltaCol > 0) // Moving right
         {
@@ -296,9 +295,9 @@ function Update(frameTime)
             pos.x += deltaCol * blockWidth;
 
             // Instantiate new blocks
-            for(var i = 0; i < numRows; ++i)
+            for(var i = 0, row = currentBlock.row-1; i < numRows; ++i, ++row)
             {
-                newBlocks.push(InstantiateSceneBlock(pos, i, currentBlock.col+deltaCol)); // +1
+                newBlocks.push(InstantiateSceneBlock(pos, row, currentBlock.col+deltaCol)); // +1
                 pos.z += blockWidth; // backwards +z
             }
 
@@ -321,16 +320,15 @@ function Update(frameTime)
         else if (deltaRow == 0 && deltaCol < 0) // Moving left
         {
             // Preprend new column, remove rightmost column(2)
-            //Log("Preprend new column, remove rightmost column");
             Log("MOVING LEFT");
 
             var pos = new float3(TopLeftBlock().aabb.minPoint);
             pos.x += deltaCol * blockWidth;
 
             // Instantiate new blocks
-            for(var i = 0; i < numRows; ++i)
+            for(var i = 0, row = currentBlock.row-1; i < numRows; ++i, ++row)
             {
-                newBlocks.push(InstantiateSceneBlock(pos, i, currentBlock.col+deltaCol)); //-1
+                newBlocks.push(InstantiateSceneBlock(pos, row, currentBlock.col+deltaCol)); //-1
                 pos.z += blockWidth;
             }
             // Gather blocks to be removed.
@@ -352,16 +350,15 @@ function Update(frameTime)
         else if (deltaRow > 0 && deltaCol == 0) // Moving backwards/"down"
         {
             // Append new row, remove top row 0
-            //Log("Append new row, remove top row");
             Log("MOVING DOWN");
 
             var pos = new float3(BottomLeftBlock().aabb.minPoint);
             pos.z += deltaRow * blockWidth;
 
             // Instantiate new blocks
-            for(var j = 0; j < numCols; ++j)
+            for(var j = 0, col = BottomLeftBlock().col; j < numCols; ++j, ++col)
             {
-                newBlocks.push(InstantiateSceneBlock(pos, currentBlock.row+deltaRow, j)); // +1
+                newBlocks.push(InstantiateSceneBlock(pos, currentBlock.row+deltaRow, col)); // +1
                 pos.x += blockWidth;
             }
 
@@ -384,16 +381,15 @@ function Update(frameTime)
         else if (deltaRow < 0  && deltaCol == 0) // Moving forward/"up"
         {
             // Prepend new column, remove bottom row
-            //Log("Prepend new row, remove bottom row");
             Log("MOVING UP");
 
             var pos = new float3(TopLeftBlock().aabb.minPoint);
             pos.z += deltaRow * blockWidth;
 
             // Instantiate new blocks
-            for(var j = 0; j < numCols; ++j)
+            for(var j = 0, col = TopLeftBlock().col; j < numCols; ++j, ++col)
             {
-                newBlocks.push(InstantiateSceneBlock(pos, currentBlock.row+deltaRow, j+deltaCol)); // -1
+                newBlocks.push(InstantiateSceneBlock(pos, currentBlock.row+deltaRow, col)); // -1
                 pos.x += blockWidth;
             }
 
@@ -466,7 +462,6 @@ function Update(frameTime)
         }
         else if (deltaCol > 0 && deltaRow < 0)
         {
-            //Foo(newPosBlockStartBlock, deltaCol, deltaRow, currentBlock)
             // Append new column and new row, remove leftmost column and bottom row
             Log("MOVING RIGHT AND UP");
             var pos = new float3(TopCenterBlock().aabb.minPoint);
