@@ -24,15 +24,14 @@ function LogD(msg) { console.LogDebug(msg); }
 if (server.IsRunning())
 {
     // numRows and numCols must be uneven and >= 3: 3,5,7,9,...
-    var numRows = 3;
-    var numCols = 3;
+    const numRows = numCols = 3;
 
     // Start point of the scene block matrix.
     var startPos = new float3(0, 0, 0);
     // NOTE: numPatches configurable only if .ntf is also re-authored.
-    var numPatches = 8;
-    var blockWidth = 16 * numPatches - 1;
-    var blockHeight = 128;
+    const numPatches = 8;
+    const blockWidth = 16 * numPatches - 1;
+    const blockHeight = 128;
 
     // Init two-dimensional scene block array
     var sceneBlocks = new Array(numRows);
@@ -200,19 +199,24 @@ function RemoveSceneBlockAt(row, col/*, saveState*/)
 
 function RemoveSceneBlock(block/*, saveState*/)
 {
-    Log("Removing scene block " + block.name);
-    // TODO
-//  if (saveState)
-//      scene.SaveSceneXML(block.name + ".txml", false, false);
-    for(var i = 0; i < block.entities.length; ++i)
-        try
-        {
-            scene.RemoveEntity(block.entities[i].id);
-        }
-        catch(e)
-        {
-            Log("RemoveSceneBlock: " + e);
-        }
+    if (block)
+    {
+        Log("Removing scene block " + block.name);
+        // TODO
+    //  if (saveState)
+    //      scene.SaveSceneXML(block.name + ".txml", false, false);
+        for(var i = 0; i < block.entities.length; ++i)
+            try
+            {
+                scene.RemoveEntity(block.entities[i].id);
+            }
+            catch(e)
+            {
+                LogW("RemoveSceneBlock: " + e);
+            }
+    }
+    else
+        LogW("RemoveSceneBlock called with null block.");
 
     block  = null;
 }
@@ -249,7 +253,7 @@ function TopCenterBlock() { return sceneBlocks[0][(numCols-1)/2]; }
 function CenterLeftBlock() { return sceneBlocks[(numRows-1)/2][0]; }
 
 var timer = 0;
-var checkInterval = 2; // in seconds
+var checkInterval = 0; // in seconds
 
 function Update(frameTime)
 {
@@ -570,16 +574,8 @@ function Update(frameTime)
             // Re-arrange the scene block matrix: move each element right and down
             for(var i = numRows-1; i > 0; --i)
                 for(var j = 0; j < numCols-1; ++j)
-                {
-                    Log(i + "," + (j+1) + " <- " + (i-1) + "," + j);
                     sceneBlocks[i][j+1] = sceneBlocks[i-1][j];
-                }
-/*
-            sceneBlocks[2][1] = sceneBlocks[1][0];
-            sceneBlocks[2][2] = sceneBlocks[1][1];
-            sceneBlocks[1][1] = sceneBlocks[0][0];
-            sceneBlocks[1][2] = sceneBlocks[0][1];
-*/
+
             RemoveSceneBlocks(oldBlocks);
 
             var idx = 0;
@@ -602,20 +598,3 @@ function Update(frameTime)
 
     previousBlock = currentBlock;
 }
-
-for(var i = 0; i < numRows-1; ++i)
-    for(var j = 0; j < numCols-1; ++j)
-        sceneBlocks[i][j] = sceneBlocks[i+1][j+1];
-        /*
-{
-    i = 0 j = 0
-    sceneBlocks[0][0] = sceneBlocks[1][1];
-    i = 0 j = 1
-    sceneBlocks[0][1] = sceneBlocks[1][2];
-
-    i = 1 j = 0
-    sceneBlocks[1][0] = sceneBlocks[2][1];
-    i = 1 j = 1
-    sceneBlocks[1][1] = sceneBlocks[2][2];
-}
-*/
