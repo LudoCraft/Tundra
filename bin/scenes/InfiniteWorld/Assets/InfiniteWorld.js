@@ -33,7 +33,7 @@ if (server.IsRunning())
     const blockWidth = 16 * numPatches - 1;
     const blockHeight = 128;
 
-    // Init two-dimensional scene block array
+    // Init the scene block matrix
     var sceneBlocks = new Array(numRows);
     for(var i = 0; i < numRows; ++i)
         sceneBlocks[i] = new Array(numCols);
@@ -86,6 +86,9 @@ function Stop()
 
 function HandleUserConnected(id, user)
 {
+    // TODO
+//    if (sceneBlocks[0][0] == null)
+//        CreateWorld();
     userEntity = scene.GetEntityByName("Avatar" + id);
     if (userEntity)
     {
@@ -117,7 +120,6 @@ function HandleUserConnected(id, user)
         userStartPos.x += blockWidth/2;
         userStartPos.y += 40;
         userStartPos.z += blockWidth/2;
-        Log("UserStartPos " + userStartPos);
         userEntity.placeable.SetPosition(userStartPos);
         userEntity.placeable.SetOrientation(Quat.FromEulerZYX(0,0,0));
 
@@ -132,23 +134,21 @@ function HandleUserDisconnected()
     // TODO: freeze scene if no users
 }
 
-// Finds the scene block user is currently at
-function CurrentSceneBlock()
+// Finds the scene block at specified world position
+function SceneBlockAt(pos)
 {
-    if (!userEntity)
-        return null;
-    var pos = userEntity.placeable.transform.pos;
     for(var i = 0; i < sceneBlocks.length; ++i)
         for(var j = 0; j < sceneBlocks[i].length; ++j)
             if (sceneBlocks[i][j].aabb.Contains(pos))
                 return sceneBlocks[i][j];
-
-    LogE("CurrentSceneBlock: could not find where the user at!");
-    return null; // Should not happen ever
+    return null;
 }
 
 function InstantiateSceneBlock(pos, rowIdx, colIdx)
 {
+    // Flat terrain
+//    var sceneBlockFile = "/Assets/SceneBlockOnlyTerrainFlat.txml";
+    // Terrain
     var sceneBlockFile = "/Assets/SceneBlockOnlyTerrain.txml";
     // Terrain + 1 FireEater:
     //var sceneBlockFile = "/Assets/SceneBlockOneNpc.txml";
@@ -253,7 +253,7 @@ function TopCenterBlock() { return sceneBlocks[0][(numCols-1)/2]; }
 function CenterLeftBlock() { return sceneBlocks[(numRows-1)/2][0]; }
 
 var timer = 0;
-var checkInterval = 0; // in seconds
+var checkInterval = 2; // in seconds
 
 function Update(frameTime)
 {
@@ -271,11 +271,12 @@ function Update(frameTime)
         return;
     timer = 0;
 
-    currentBlock = CurrentSceneBlock();
-    if (!currentBlock)
-        return; // Should happen only if scene matrix in malformed state
-
-//    Log("User is at " + currentBlock.name);
+    currentBlock = SceneBlockAt(userEntity.placeable.transform.pos);
+    if (!currentBlock)  // Should happen only if scene matrix in malformed state
+    {
+        LogE("Update: could not find where the user at!");
+        return;
+    }
 
     if (currentBlock != previousBlock && previousBlock != null)
     {
@@ -295,7 +296,6 @@ function Update(frameTime)
         if (deltaRow == 0 && deltaCol > 0) // Moving right
         {
             // Append new column, remove leftmost column (00, 10, 20)
-            //Log("Append new column, remove leftmost column");
             Log("MOVING RIGHT");
 
             var pos = new float3(TopRightBlock().aabb.minPoint);
@@ -551,17 +551,17 @@ function Update(frameTime)
             pos.x += deltaCol * blockWidth;
 
             // Add new leftmost column
-            for(var i = 0, row = -1; i < numRows; ++i, --row)
+            for(var i = 0, row = CenterLeftBlock().row; i < numRows; ++i, --row)
             {
-                newBlocks.push(InstantiateSceneBlock(pos, row, currentBlock.col));
+                newBlocks.push(InstantiateSceneBlock(pos, row, currentBlock.col+deltaCol));
                 pos.z -= blockWidth;
             }
             // Add new top row, skip top left, already instantiated
             pos.z += blockWidth;
             pos.x += blockWidth;
-            for(var j = 1, col = SOMETINHG; j < numCols; ++j, ++col)
+            for(var j = 0, col = currentBlock.col+deltaCol+1; j < numCols-1; ++j, ++col)
             {
-                newBlocks.push(InstantiateSceneBlock(pos, lastRow, col));
+                newBlocks.push(InstantiateSceneBlock(pos, currentBlock.row+deltaRow, col));
                 pos.x += blockWidth;
             }
 
@@ -571,18 +571,19 @@ function Update(frameTime)
             for(var i = 0; i < numRows-1; ++i) // rightmost column
                 oldBlocks.push(sceneBlocks[i][numCols-1]);
 
-            // Re-arrange the scene block matrix: move each element right and down
+            // Re-arrange the scene block matrix: move each right and down
             for(var i = numRows-1; i > 0; --i)
                 for(var j = 0; j < numCols-1; ++j)
                     sceneBlocks[i][j+1] = sceneBlocks[i-1][j];
 
             RemoveSceneBlocks(oldBlocks);
 
+            // Insert new blocks.
             var idx = 0;
-            for(var j = numCols-1; j >= 0 ; --j)
-                sceneBlocks[numRows-1][j] = newBlocks[idx++];
-            for(var i = numRows-1-1; i >= 0; --i)
+            for(var i = numRows-1; i >= 0; --i)
                 sceneBlocks[i][0] = newBlocks[idx++];
+            for(var j = 1; j < numCols; ++j)
+                sceneBlocks[0][j] = newBlocks[idx++];
         }
         else
         {
