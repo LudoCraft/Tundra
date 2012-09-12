@@ -20,10 +20,12 @@
 #include "EC_Placeable.h"
 #include "QScriptEngineHelpers.h"
 
-#include "MemoryLeakCheck.h"
-
 #include <QWebView>
 #include <QList>
+
+#include "MemoryLeakCheck.h"
+
+Q_DECLARE_METATYPE(ECEditorWindow *)
 
 // Shortcuts for config keys.
 static const char *cGizmoEnabled= "show editing gizmo";
@@ -138,6 +140,13 @@ void ECEditorModule::ShowEditorWindow()
 {
     if (framework_->IsHeadless())
         return;
+    
+    // Check null scene here, don't let it go to the ECEditorWindow ctor.
+    if (!GetFramework()->Scene()->MainCameraScene())
+    {
+        LogError("ECEditorModule::ShowEditorWindow: Main camera scene is null.");
+        return;
+    }
 
     ConfigAPI &config = *framework_->Config();
     ConfigData configData(ConfigAPI::FILE_FRAMEWORK, Name(), cECEditorWindowPos);
@@ -270,7 +279,7 @@ void ECEditorModule::HandleKeyPressed(KeyEvent *e)
                     /// @todo Shouldn't "select all" select all, not exclude some entities with some random criteria?
                     /// Maybe add separate actions for the right-click context menu for each criteria (local, replicated, temprorary etc.)
                     QList<entity_id_t> entIdsSelection;
-                    foreach(const EntityPtr &e, activeScene->GetEntitiesWithComponent(EC_Placeable::TypeNameStatic()))
+                    foreach(const EntityPtr &e, activeScene->EntitiesWithComponent(EC_Placeable::TypeNameStatic()))
                         if (!e->IsTemporary())
                             entIdsSelection.append(e->Id());
 

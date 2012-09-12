@@ -792,9 +792,8 @@ void SceneImporter::ProcessNodeForCreation(QList<Entity* > &entities, QDomElemen
                         {
                             QString material_name = subentity_elem.attribute("materialName") + ".material";
                             material_name.replace('/', '_');
-                            
-                            int index = ParseString<int>(subentity_elem.attribute("index").toStdString());
-                            
+
+                            int index = subentity_elem.attribute("index").toInt();
                             material_name = prefix + material_name;
                             if (index >= materials.size())
                                 materials.resize(index + 1);
@@ -1065,7 +1064,7 @@ void SceneImporter::CreateAssetDescs(const QString &path, const QStringList &mes
         AssetDesc ad;
         ad.source = filename;
         ad.dataInMemory = false;
-        ad.typeName = "mesh";
+        ad.typeName = "OgreMesh";
         ad.destinationName = QFileInfo(filename).fileName();//meshAssetDesc.source;
         desc.assets[qMakePair(ad.source, ad.subname)] = ad;
     }
@@ -1075,7 +1074,7 @@ void SceneImporter::CreateAssetDescs(const QString &path, const QStringList &mes
         AssetDesc ad;
         ad.source = path + "/" + skeleton; // This is already an absolute path. No need to use ResolveLocalAssetPath.
         ad.dataInMemory = false;
-        ad.typeName = "skeleton";
+        ad.typeName = "OgreSkeleton";
         ad.destinationName = skeleton;
         desc.assets[qMakePair(ad.source, ad.subname)] = ad;
     }
@@ -1092,7 +1091,7 @@ void SceneImporter::CreateAssetDescs(const QString &path, const QStringList &mes
     foreach(QString matName, usedMaterials)
     {
         AssetDesc ad;
-        ad.typeName = "material";
+        ad.typeName = "OgreMaterial";
         ad.subname = matName;
         ad.dataInMemory = true;
         ad.destinationName = matName + ".material";
@@ -1117,7 +1116,7 @@ void SceneImporter::CreateAssetDescs(const QString &path, const QStringList &mes
     foreach(QString tex, all_textures)
     {
         AssetDesc ad;
-        ad.typeName = "texture";
+        ad.typeName = "Texture";
         ad.dataInMemory = false;
         AssetAPI::FileQueryResult result = scene_->GetFramework()->Asset()->ResolveLocalAssetPath(tex, path, ad.source);
         if (result == AssetAPI::FileQueryLocalFileMissing)

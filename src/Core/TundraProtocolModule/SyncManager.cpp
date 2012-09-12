@@ -85,11 +85,18 @@ SyncManager::SyncManager(TundraLogicModule* owner) :
     owner_(owner),
     framework_(owner->GetFramework()),
     updatePeriod_(1.0f / 20.0f),
-    updateAcc_(0.0)
+    updateAcc_(0.0),
+    maxLinExtrapTime_(3.0f),
+    noClientPhysicsHandoff_(false)
 {
     KristalliProtocolModule *kristalli = framework_->GetModule<KristalliProtocolModule>();
     connect(kristalli, SIGNAL(NetworkMessageReceived(kNet::MessageConnection *, kNet::packet_id_t, kNet::message_id_t, const char *, size_t)), 
         this, SLOT(HandleKristalliMessage(kNet::MessageConnection*, kNet::packet_id_t, kNet::message_id_t, const char*, size_t)));
+    
+    if (framework_->HasCommandLineParameter("--noclientphysics"))
+        noClientPhysicsHandoff_ = true;
+    
+    GetClientExtrapolationTime();
 }
 
 SyncManager::~SyncManager()
@@ -102,16 +109,33 @@ void SyncManager::SetUpdatePeriod(float period)
     if (period < 0.01f)
         period = 0.01f;
     updatePeriod_ = period;
+    
+    GetClientExtrapolationTime();
 }
 
-SceneSyncState* SyncManager::SceneState(int connectionId)
+void SyncManager::GetClientExtrapolationTime()
+{
+    QStringList extrapTimeParam = framework_->CommandLineParameters("--clientextrapolationtime");
+    if (extrapTimeParam.size() > 0)
+    {
+        bool ok;
+        float newExtrapTime = extrapTimeParam.first().toFloat(&ok);
+        if (ok && newExtrapTime >= 0.0f)
+        {
+            // First update period is always interpolation, and extrapolation time is in addition to that
+            maxLinExtrapTime_ = 1.0f + newExtrapTime / 1000.0f / updatePeriod_;
+        }
+    }
+}
+
+SceneSyncState* SyncManager::SceneState(int connectionId) const
 {
     if (!owner_->IsServer())
         return 0;
     return SceneState(owner_->GetServer()->GetUserConnection(connectionId));
 }
 
-SceneSyncState* SyncManager::SceneState(UserConnection *connection)
+SceneSyncState* SyncManager::SceneState(const UserConnectionPtr &connection) const
 {
     if (!owner_->IsServer())
         return 0;
@@ -211,7 +235,7 @@ void SyncManager::HandleKristalliMessage(kNet::MessageConnection* source, kNet::
     currentSender = 0;
 }
 
-void SyncManager::NewUserConnected(UserConnection* user)
+void SyncManager::NewUserConnected(const UserConnectionPtr &user)
 {
     PROFILE(SyncManager_NewUserConnected);
 
@@ -223,15 +247,15 @@ void SyncManager::NewUserConnected(UserConnection* user)
     }
     
     // Connect to actions sent to specifically to this user
-    connect(user, SIGNAL(ActionTriggered(UserConnection*, Entity*, const QString&, const QStringList&)),
+    connect(user.get(), SIGNAL(ActionTriggered(UserConnection*, Entity*, const QString&, const QStringList&)),
         this, SLOT(OnUserActionTriggered(UserConnection*, Entity*, const QString&, const QStringList&)));
     
     // Mark all entities in the sync state as new so we will send them
-    user->syncState = boost::make_shared<SceneSyncState>(user->GetConnectionID(), owner_->IsServer());
+    user->syncState = boost::make_shared<SceneSyncState>(user->ConnectionId(), owner_->IsServer());
     user->syncState->SetParentScene(scene_);
 
     if (owner_->IsServer())
-        emit SceneStateCreated(user, user->syncState.get());
+        emit SceneStateCreated(user.get(), user->syncState.get());
 
     for(Scene::iterator iter = scene->begin(); iter != scene->end(); ++iter)
     {
@@ -576,7 +600,7 @@ void SyncManager::InterpolateRigidBodies(f64 frametime, SceneSyncState* state)
         }
         else // Linear extrapolation if server has not sent an update.
         {
-            if (isNewtonian)
+            if (isNewtonian && maxLinExtrapTime_ > 1.0f)
                 pos = r.interpEnd.pos + r.interpEnd.vel * (r.interpTime-1.f) * interpPeriod;
             else
                 pos = r.interpEnd.pos;
@@ -593,21 +617,23 @@ void SyncManager::InterpolateRigidBodies(f64 frametime, SceneSyncState* state)
 
         // Local simulation steps:
         // One fixed update interval: interpolate
-        // Four subsequent update intervals: linear extrapolation
+        // Two subsequent update intervals: linear extrapolation
         // All subsequente update intervals: local physics extrapolation.
-        const float maxLinExtrapTime = 15.f; // For one second of extrapolation set to 1.f / interpPeriod;
-        if (r.interpTime >= maxLinExtrapTime) // Hand-off to client-side physics?
+        if (r.interpTime >= maxLinExtrapTime_) // Hand-off to client-side physics?
         {
             if (rigidBody)
             {
-                bool objectIsInRest = (r.interpEnd.vel.LengthSq() < 1e-4f && r.interpEnd.angVel.LengthSq() < 1e-4f);
-                // Now the local client-side physics will take over the simulation of this rigid body, but only if the object
-                // is moving. This is because the client shouldn't wake up the object (locally) if it's stationary, but wait for the
-                // server-side signal for that event.
-                rigidBody->SetClientExtrapolating(objectIsInRest == false);
-                // Give starting parameters for the simulation.
-                rigidBody->linearVelocity.Set(r.interpEnd.vel, AttributeChange::LocalOnly);
-                rigidBody->angularVelocity.Set(r.interpEnd.angVel, AttributeChange::LocalOnly);
+                if (!noClientPhysicsHandoff_)
+                {
+                    bool objectIsInRest = (r.interpEnd.vel.LengthSq() < 1e-4f && r.interpEnd.angVel.LengthSq() < 1e-4f);
+                    // Now the local client-side physics will take over the simulation of this rigid body, but only if the object
+                    // is moving. This is because the client shouldn't wake up the object (locally) if it's stationary, but wait for the
+                    // server-side signal for that event.
+                    rigidBody->SetClientExtrapolating(objectIsInRest == false);
+                    // Give starting parameters for the simulation.
+                    rigidBody->linearVelocity.Set(r.interpEnd.vel, AttributeChange::LocalOnly);
+                    rigidBody->angularVelocity.Set(r.interpEnd.angVel, AttributeChange::LocalOnly);
+                }
                 r.interpolatorActive = false;
             }
             ++iter;
@@ -687,6 +713,8 @@ void SyncManager::Update(f64 frametime)
 
 void SyncManager::ReplicateRigidBodyChanges(kNet::MessageConnection* destination, SceneSyncState* state)
 {
+    PROFILE(SyncManager_ReplicateRigidBodyChanges);
+    
     ScenePtr scene = scene_.lock();
     if (!scene)
         return;
@@ -775,7 +803,7 @@ void SyncManager::ReplicateRigidBodyChanges(kNet::MessageConnection* destination
         float timeSinceLastSend = kNet::Clock::SecondsSinceF(ess.lastNetworkSendTime);
         const float3 predictedClientSidePosition = ess.transform.pos + timeSinceLastSend * ess.linearVelocity;
         float error = t.pos.DistanceSq(predictedClientSidePosition);
-
+        UNREFERENCED_PARAM(error)
         // TEST: To have the server estimate how far the client has simulated, use this.
 //        bool posChanged = transformDirty && (timeSinceLastSend > 0.2f || t.pos.DistanceSq(/*ess.transform.pos*/ predictedClientSidePosition) > 5e-5f);
         bool posChanged = transformDirty && t.pos.DistanceSq(ess.transform.pos) > 1e-3f;
@@ -827,6 +855,7 @@ void SyncManager::ReplicateRigidBodyChanges(kNet::MessageConnection* destination
             continue;
 
         int bitIdx = ds.BitsFilled();
+        UNREFERENCED_PARAM(bitIdx)
         ds.AddVLE<kNet::VLE8_16_32>(ess.id); // Sends max. 32 bits.
 
         ds.AddArithmeticEncoded(8, posSendType, 3, rotSendType, 4, scaleSendType, 3, velSendType, 3, angVelSendType, 2); // Sends fixed 8 bits.
@@ -925,6 +954,7 @@ void SyncManager::ReplicateRigidBodyChanges(kNet::MessageConnection* destination
 //        std::cout << "pos: " << posSendType << ", rot: " << rotSendType << ", scale: " << scaleSendType << ", vel: " << velSendType << ", angvel: " << angVelSendType << std::endl;
 
         int bitsEnd = ds.BitsFilled();
+        UNREFERENCED_PARAM(bitsEnd)
         ess.lastNetworkSendTime = kNet::Clock::Tick();
     }
     if (ds.BytesFilled() > 0)
@@ -1119,6 +1149,7 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
     ScenePtr scene = scene_.lock();
     int numMessagesSent = 0;
     bool isServer = owner_->IsServer();
+    UNREFERENCED_PARAM(isServer)
     
     // Process the state's dirty entity queue.
     /// \todo Limit and prioritize the data sent. For now the whole queue is processed, regardless of whether the connection is being saturated.
@@ -1438,8 +1469,8 @@ bool SyncManager::ValidateAction(kNet::MessageConnection* source, unsigned messa
         return true;
     
     // And for now, always also trust scene actions from clients, if they are known and authenticated
-    UserConnection* user = owner_->GetKristalliModule()->GetUserConnection(source);
-    if ((!user) || (user->properties["authenticated"] != "true"))
+    UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(source);
+    if (!user || user->properties["authenticated"] != "true")
         return false;
     
     return true;
@@ -1448,7 +1479,7 @@ bool SyncManager::ValidateAction(kNet::MessageConnection* source, unsigned messa
 void SyncManager::HandleCreateEntity(kNet::MessageConnection* source, const char* data, size_t numBytes)
 {
     assert(source);
-    UserConnection* user = owner_->GetKristalliModule()->GetUserConnection(source);
+    UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(source);
     
     // Get matching syncstate for reflecting the changes
     SceneSyncState* state = GetSceneSyncState(source);
@@ -1459,7 +1490,7 @@ void SyncManager::HandleCreateEntity(kNet::MessageConnection* source, const char
         return;
     }
 
-    if (!scene->AllowModifyEntity(user, 0)) //should be 'ModifyScene', but ModifyEntity is now the signal that covers all
+    if (!scene->AllowModifyEntity(user.get(), 0)) //should be 'ModifyScene', but ModifyEntity is now the signal that covers all
         return;
 
     bool isServer = owner_->IsServer();
@@ -1571,7 +1602,7 @@ void SyncManager::HandleCreateEntity(kNet::MessageConnection* source, const char
                 newAttr->FromBinary(attrDs, AttributeChange::Disconnected);
             }
         }
-    } catch(kNet::NetException &e)
+    } catch(kNet::NetException &/*e*/)
     {
         LogError("Failed to deserialize the creation of a new entity from the peer. Deleting the partially crafted entity!");
         scene->RemoveEntity(entity->Id(), AttributeChange::Disconnected);
@@ -1642,8 +1673,8 @@ void SyncManager::HandleCreateComponents(kNet::MessageConnection* source, const 
             return;
         }
 
-        UserConnection* user = owner_->GetKristalliModule()->GetUserConnection(source);
-        if (!scene->AllowModifyEntity(user, entity.get()))
+        UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(source);
+        if (!scene->AllowModifyEntity(user.get(), entity.get()))
             return;
         
         // Read the components
@@ -1706,7 +1737,7 @@ void SyncManager::HandleCreateComponents(kNet::MessageConnection* source, const 
                 newAttr->FromBinary(attrDs, AttributeChange::Disconnected);
             }
         }
-    } catch(kNet::NetException &e)
+    } catch(kNet::NetException &/*e*/)
     {
         LogError("Failed to deserialize the creation of new component(s) from the peer. Deleting the partially crafted components!");
         for(size_t i = 0; i < addedComponents.size(); ++i)
@@ -1752,6 +1783,7 @@ void SyncManager::HandleRemoveEntity(kNet::MessageConnection* source, const char
     
     kNet::DataDeserializer ds(data, numBytes);
     unsigned sceneID = ds.ReadVLE<kNet::VLE8_16_32>(); ///\todo Dummy ID. Lookup scene once multiscene is properly supported
+    UNREFERENCED_PARAM(sceneID)
     entity_id_t entityID = ds.ReadVLE<kNet::VLE8_16_32>();
     
     if (!ValidateAction(source, cRemoveEntityMessage, entityID))
@@ -1759,8 +1791,8 @@ void SyncManager::HandleRemoveEntity(kNet::MessageConnection* source, const char
 
     EntityPtr entity = scene->GetEntity(entityID);
 
-    UserConnection *user = owner_->GetKristalliModule()->GetUserConnection(source);
-    if (entity && !scene->AllowModifyEntity(user, entity.get()))
+    UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(source);
+    if (entity && !scene->AllowModifyEntity(user.get(), entity.get()))
         return;
 
     if (!scene->GetEntity(entityID))
@@ -1793,6 +1825,7 @@ void SyncManager::HandleRemoveComponents(kNet::MessageConnection* source, const 
     
     kNet::DataDeserializer ds(data, numBytes);
     unsigned sceneID = ds.ReadVLE<kNet::VLE8_16_32>(); ///\todo Dummy ID. Lookup scene once multiscene is properly supported
+    UNREFERENCED_PARAM(sceneID)
     entity_id_t entityID = ds.ReadVLE<kNet::VLE8_16_32>();
     
     if (!ValidateAction(source, cRemoveComponentsMessage, entityID))
@@ -1800,8 +1833,8 @@ void SyncManager::HandleRemoveComponents(kNet::MessageConnection* source, const 
 
     EntityPtr entity = scene->GetEntity(entityID);
 
-    UserConnection *user = owner_->GetKristalliModule()->GetUserConnection(source);
-    if (entity && !scene->AllowModifyEntity(user, entity.get()))
+    UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(source);
+    if (entity && !scene->AllowModifyEntity(user.get(), entity.get()))
         return;
 
     if (!entity)
@@ -1847,20 +1880,21 @@ void SyncManager::HandleCreateAttributes(kNet::MessageConnection* source, const 
     
     kNet::DataDeserializer ds(data, numBytes);
     unsigned sceneID = ds.ReadVLE<kNet::VLE8_16_32>(); ///\todo Dummy ID. Lookup scene once multiscene is properly supported
+    UNREFERENCED_PARAM(sceneID)
     entity_id_t entityID = ds.ReadVLE<kNet::VLE8_16_32>();
     
     if (!ValidateAction(source, cCreateAttributesMessage, entityID))
         return;
     
     EntityPtr entity = scene->GetEntity(entityID);
-    UserConnection* user = owner_->GetKristalliModule()->GetUserConnection(source);
+    UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(source);
     if (!entity)
     {
         LogWarning("Entity " + QString::number(entityID) + " not found for CreateAttributes message");
         return;
     }
 
-    if (!scene->AllowModifyEntity(user, 0)) //to check if creating entities is allowed (for this user)
+    if (!scene->AllowModifyEntity(user.get(), 0)) //to check if creating entities is allowed (for this user)
         return;
 
     std::vector<IAttribute*> addedAttrs;
@@ -1900,7 +1934,7 @@ void SyncManager::HandleCreateAttributes(kNet::MessageConnection* source, const 
         try
         {
             attr->FromBinary(ds, AttributeChange::Disconnected);
-        } catch (kNet::NetException &e)
+        } catch (kNet::NetException &/*e*/)
         {
             LogError("Failed to deserialize the creation of a new attribute from the peer!");
             comp->RemoveAttribute(attrIndex, AttributeChange::Disconnected);
@@ -1940,6 +1974,7 @@ void SyncManager::HandleRemoveAttributes(kNet::MessageConnection* source, const 
     
     kNet::DataDeserializer ds(data, numBytes);
     unsigned sceneID = ds.ReadVLE<kNet::VLE8_16_32>(); ///\todo Dummy ID. Lookup scene once multiscene is properly supported
+    UNREFERENCED_PARAM(sceneID)
     entity_id_t entityID = ds.ReadVLE<kNet::VLE8_16_32>();
     
     if (!ValidateAction(source, cRemoveAttributesMessage, entityID))
@@ -1947,8 +1982,8 @@ void SyncManager::HandleRemoveAttributes(kNet::MessageConnection* source, const 
     
     EntityPtr entity = scene->GetEntity(entityID);
 
-    UserConnection *user = owner_->GetKristalliModule()->GetUserConnection(source);
-    if (entity && !scene->AllowModifyEntity(user, entity.get()))
+    UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(source);
+    if (entity && !scene->AllowModifyEntity(user.get(), entity.get()))
         return;
 
     if (!entity)
@@ -1993,15 +2028,16 @@ void SyncManager::HandleEditAttributes(kNet::MessageConnection* source, const ch
     
     kNet::DataDeserializer ds(data, numBytes);
     unsigned sceneID = ds.ReadVLE<kNet::VLE8_16_32>(); ///\todo Dummy ID. Lookup scene once multiscene is properly supported
+    UNREFERENCED_PARAM(sceneID)
     entity_id_t entityID = ds.ReadVLE<kNet::VLE8_16_32>();
     
     if (!ValidateAction(source, cRemoveAttributesMessage, entityID))
         return;
         
     EntityPtr entity = scene->GetEntity(entityID);
-    UserConnection* user = owner_->GetKristalliModule()->GetUserConnection(source);
+    UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(source);
 
-    if (entity && !scene->AllowModifyEntity(user, entity.get())) // check if allowed to modify this entity.
+    if (entity && !scene->AllowModifyEntity(user.get(), entity.get())) // check if allowed to modify this entity.
         return;
 
     if (!entity)
@@ -2134,6 +2170,7 @@ void SyncManager::HandleCreateEntityReply(kNet::MessageConnection* source, const
     
     kNet::DataDeserializer ds(data, numBytes);
     unsigned sceneID = ds.ReadVLE<kNet::VLE8_16_32>(); ///\todo Dummy ID. Lookup scene once multiscene is properly supported
+    UNREFERENCED_PARAM(sceneID)
     entity_id_t senderEntityID = ds.ReadVLE<kNet::VLE8_16_32>() | UniqueIdGenerator::FIRST_UNACKED_ID;
     entity_id_t entityID = ds.ReadVLE<kNet::VLE8_16_32>();
     scene->ChangeEntityId(senderEntityID, entityID);
@@ -2201,6 +2238,7 @@ void SyncManager::HandleCreateComponentsReply(kNet::MessageConnection* source, c
     
     kNet::DataDeserializer ds(data, numBytes);
     unsigned sceneID = ds.ReadVLE<kNet::VLE8_16_32>(); ///\todo Dummy ID. Lookup scene once multiscene is properly supported
+    UNREFERENCED_PARAM(sceneID)
     entity_id_t entityID = ds.ReadVLE<kNet::VLE8_16_32>();
     state->RemoveFromQueue(entityID); // Make sure we don't have stale pointers in the dirty queue
     EntitySyncState& entityState = state->entities[entityID];
@@ -2262,7 +2300,7 @@ void SyncManager::HandleEntityAction(kNet::MessageConnection* source, MsgEntityA
         Server* server = owner_->GetServer().get();
         if (server)
         {
-            UserConnection* user = owner_->GetKristalliModule()->GetUserConnection(source);
+            UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(source);
             server->SetActionSender(user);
         }
     }
@@ -2298,7 +2336,7 @@ void SyncManager::HandleEntityAction(kNet::MessageConnection* source, MsgEntityA
     // Clear the action sender after action handling
     Server *server = owner_->GetServer().get();
     if (server)
-        server->SetActionSender(0);
+        server->SetActionSender(UserConnectionPtr());
 }
 
 SceneSyncState* SyncManager::GetSceneSyncState(kNet::MessageConnection* connection)

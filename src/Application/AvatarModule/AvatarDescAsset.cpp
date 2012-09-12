@@ -535,6 +535,67 @@ void AvatarDescAsset::SetMaterial(uint index, const QString& ref)
     AssetReferencesChanged();
 }
 
+void AvatarDescAsset::RemoveAttachment(uint index)
+{
+    if (index < attachments_.size())
+    {
+        attachments_.erase(attachments_.begin() + index);
+        emit AppearanceChanged();
+    }
+    else
+        LogError("Failed to remove attachment at index " + QString::number(index) + "! Only " + attachments_.size() + "  attachments exist on the avatar asset!");
+}
+
+void AvatarDescAsset::RemoveAttachmentsByCategory(QString category)
+{
+    std::vector<int> toRemove;
+
+    for (uint i = 0; i < attachments_.size(); i++)
+    {
+        if (attachments_[i].category_ == category)
+        {
+            toRemove.push_back(i);
+        }
+    }
+
+    // Remove the attachments, starting from the end of the vector.
+    for (int i = toRemove.size()-1; i >= 0; --i)
+        RemoveAttachment(toRemove[i]);
+}
+
+void AvatarDescAsset::AddAttachment(AssetPtr assetPtr)
+{
+    std::vector<u8> data;
+    bool success = assetPtr->SerializeTo(data);
+    if (!success || data.size() == 0)
+    {
+        LogError("AvatarDescAssett::AddAttachment: Could not serialize attachment");
+        return;
+    }
+
+    QString string = QString::fromUtf8((char*)&data[0], data.size());
+
+    QDomDocument attachDoc("Attachment");
+    if (!attachDoc.setContent(string))
+    {
+        LogError("AvatarDescAsset::AddAttachment: Could not parse attachment data");
+        return;
+    }
+
+    QDomElement elem = attachDoc.firstChildElement("attachment");
+
+    if (!elem.isNull())
+    {
+        ReadAttachment(elem);
+        AssetReferencesChanged();
+        emit AppearanceChanged();
+    }
+    else
+    {
+        LogError("AvatarDescAsset::AddAttachment: Null attachment");
+    }
+}
+
 bool AvatarDescAsset::HasProperty(const QString &name) const
 {
     QMap<QString, QString>::const_iterator i = properties_.find(name);
@@ -566,7 +627,7 @@ void AvatarDescAsset::DependencyLoaded(AssetPtr dependee)
     IAsset::DependencyLoaded(dependee);
     
     // Emit AppearanceChanged() when all references have been loaded, and the avatar description is ready to use
-    if (assetAPI->NumPendingDependencies(this->shared_from_this()) == 0)
+    if (!assetAPI->HasPendingDependencies(this->shared_from_this()))
         emit AppearanceChanged();
 }
 
@@ -824,7 +885,7 @@ QDomElement AvatarDescAsset::WriteAttachment(QDomDocument& dest, const AvatarAtt
     elem.appendChild(name_elem);
     
     QDomElement mesh_elem = dest.createElement("mesh");
-    mesh_elem.setAttribute("name", mesh);
+    mesh_elem.setAttribute("name", attachment.mesh_);
     int link = 0;
     if (attachment.link_skeleton_)
         link = 1;
@@ -853,7 +914,7 @@ QDomElement AvatarDescAsset::WriteAttachment(QDomDocument& dest, const AvatarAtt
         QDomElement bone_elem = dest.createElement("bone");
         bone_elem.setAttribute("name", boneName);
         bone_elem.setAttribute("offset", attachment.transform_.position_.SerializeToString().c_str());
-        bone_elem.setAttribute("rotation", attachment.transform_.orientation_.SerializeToString().c_str());
+        bone_elem.setAttribute("rotation", attachment.transform_.orientation_.SerializeToStringWXYZ().c_str());
         bone_elem.setAttribute("scale", attachment.transform_.scale_.SerializeToString().c_str());
 
         avatar_elem.appendChild(bone_elem);

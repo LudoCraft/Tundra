@@ -20,8 +20,6 @@ if (!framework.IsHeadless())
 
     // File menu
     var fileMenu = menu.addMenu("&File");
-    if (framework.GetModuleByName("UpdateModule"))
-        fileMenu.addAction(new QIcon(installDir + "data/ui/images/icon/update.ico"), "Check Updates").triggered.connect(CheckForUpdates);
 
     var screenshotAct = fileMenu.addAction("Take Screenshot");
     screenshotAct.triggered.connect(TakeScreenshot);
@@ -51,11 +49,16 @@ if (!framework.IsHeadless())
     {
         viewMenu.addAction("Assets").triggered.connect(OpenAssetsWindow);
         viewMenu.addAction("Scene").triggered.connect(OpenSceneWindow);
+        viewMenu.addAction("Key Bindings").triggered.connect(OpenKeyBindingsWindow);
     }
 
     var ecEditor = framework.GetModuleByName("ECEditor");
     if (ecEditor)
         viewMenu.addAction("EC Editor").triggered.connect(OpenEcEditorWindow);
+
+    // TODO: Avatar Editor menu action disabled for now, as it's not fully ready for end-users
+//    if (framework.GetModuleByName("Avatar"))
+//        viewMenu.addAction("Avatar Editor").triggered.connect(OpenAvatarEditorWindow);
 
     if (framework.GetModuleByName("DebugStats"))
         viewMenu.addAction("Profiler").triggered.connect(OpenProfilerWindow);
@@ -185,11 +188,6 @@ if (!framework.IsHeadless())
         }
     }
 
-    function CheckForUpdates() {
-        if (framework.GetModuleByName("UpdateModule"))
-            framework.GetModuleByName("UpdateModule").RunUpdater("/checknow");
-    }
-
     function OpenMailingListUrl() {
         QDesktopServices.openUrl(new QUrl("http://groups.google.com/group/realxtend/"));
     }
@@ -208,6 +206,10 @@ if (!framework.IsHeadless())
 
     function OpenAssetsWindow() {
         framework.GetModuleByName("SceneStructure").ToggleAssetsWindow();
+    }
+
+    function OpenKeyBindingsWindow() {
+        framework.GetModuleByName("SceneStructure").ToggleKeyBindingsWindow();
     }
 
     function OpenProfilerWindow() {
@@ -237,6 +239,12 @@ if (!framework.IsHeadless())
     function OpenEcEditorWindow() {
         framework.GetModuleByName("ECEditor").ShowEditorWindow();
     }
+
+    function OpenAvatarEditorWindow() {
+        framework.GetModuleByName("Avatar").ToggleAvatarEditorWindow();
+        if (client.IsConnected())
+           framework.GetModuleByName("Avatar").EditAvatar("Avatar" + client.GetConnectionID())
+   }
 
     function ShowEditingGizmo(show) {
         framework.GetModuleByName("ECEditor").gizmoEnabled = show;

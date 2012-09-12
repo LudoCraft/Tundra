@@ -32,6 +32,8 @@
 
 #include "MemoryLeakCheck.h"
 
+namespace
+{
 /// Temporary utility structure for storing supported command line parameters and their descriptions.
 /** @cond PRIVATE */
 struct CommandLineParameterMap
@@ -55,7 +57,7 @@ struct CommandLineParameterMap
 #else
             struct winsize w;
             ioctl(0, TIOCGWINSZ, &w);
-            const int maxLineWidth = (int)w.ws_row;
+            const int maxLineWidth = (int)w.ws_col;
 #endif
             int cmdLength = it.key().length();
             ss << it.key().toStdString();
@@ -90,6 +92,8 @@ struct CommandLineParameterMap
     QMap<QString, QString> commands;
 };
 /** @endcond */
+
+} //~unnamed namespace
 
 Framework *Framework::instance = 0;
 
@@ -140,41 +144,58 @@ Framework::Framework(int argc_, char** argv_) :
     CommandLineParameterMap cmdLineDescs;
 #ifdef WIN32
     cmdLineDescs.commands["--console"] = "Shows a text-based console along with the main UI window.";
-    cmdLineDescs.commands["--sharedconsole"] = "Same as '--console' but attaches the Tundra console to the parent process, without creating new command promt for the console.";
+    cmdLineDescs.commands["--sharedConsole"] = "Same as '--console' but attaches the Tundra console to the parent process, without creating new command prompt for the console.";
+    cmdLineDescs.commands["--perfHud"] = "Use Ogre with NVIDIA PerfHUD enabled, if applicable.";
+    cmdLineDescs.commands["--d3d9"] = "Use Ogre with \"Direct3D9 Rendering Subsystem\", overrides the option that was set in config.";
+    cmdLineDescs.commands["--direct3d9"] = "Same as --d3d9.";
 #endif
     cmdLineDescs.commands["--help"] = "Produces help message."; // Framework
     cmdLineDescs.commands["--version"] = "Produces version information."; // Framework
     cmdLineDescs.commands["--headless"] = "Runs Tundra in headless mode without any windows or rendering."; // Framework
-    cmdLineDescs.commands["--disablerunonload"] = "Prevents script applications (EC_Script's with applicationName defined) staring automatically."; //JavascriptModule
+    cmdLineDescs.commands["--disableRunOnLoad"] = "Prevents script applications (EC_Script's with applicationName defined) starting automatically."; //JavascriptModule
     cmdLineDescs.commands["--server"] = "Starts Tundra as server."; // TundraLogicModule
     cmdLineDescs.commands["--port"] = "Specifies the Tundra server port."; // TundraLogicModule
     cmdLineDescs.commands["--protocol"] = "Specifies the Tundra server protocol. Options: '--protocol tcp' and '--protocol udp'. Defaults to udp if no protocol is spesified."; // KristalliProtocolModule
-    cmdLineDescs.commands["--fpslimit"] = "Specifies the FPS cap to use in rendering. Default: 60. Pass in 0 to disable."; // Framework
+    cmdLineDescs.commands["--fpsLimit"] = "Specifies the FPS cap to use in rendering. Default: 60. Pass in 0 to disable."; // Framework
     cmdLineDescs.commands["--run"] = "Runs script on startup"; // JavaScriptModule
     cmdLineDescs.commands["--file"] = "Specifies a startup scene file. Multiple files supported. Accepts absolute and relative paths, local:// and http:// are accepted and fetched via the AssetAPI."; // TundraLogicModule & AssetModule
     cmdLineDescs.commands["--storage"] = "Adds the given directory as a local storage directory on startup."; // AssetModule
     cmdLineDescs.commands["--config"] = "Specifies a startup configration file to use. Multiple config files are supported, f.ex. '--config plugins.xml --config MyCustomAddons.xml'."; // Framework & PluginAPI
     cmdLineDescs.commands["--connect"] = "Connects to a Tundra server automatically. Syntax: '--connect serverIp;port;protocol;name;password'. Password is optional."; // TundraLogicModule & AssetModule
     cmdLineDescs.commands["--login"] = "Automatically login to server using provided data. Url syntax: {tundra|http|https}://host[:port]/?username=x[&password=y&avatarurl=z&protocol={udp|tcp}]. Minimum information needed to try a connection in the url are host and username."; // TundraLogicModule & AssetModule
-    cmdLineDescs.commands["--netrate"] = "Specifies the number of network updates per second. Default: 30."; // TundraLogicModule
-    cmdLineDescs.commands["--noassetcache"] = "Disable asset cache."; // Framework
-    cmdLineDescs.commands["--assetcachedir"] = "Specify asset cache directory to use."; // Framework
+    cmdLineDescs.commands["--netRate"] = "Specifies the number of network updates per second. Default: 30."; // TundraLogicModule
+    cmdLineDescs.commands["--noAssetCache"] = "Disable asset cache."; // Framework
+    cmdLineDescs.commands["--assetCacheDir"] = "Specify asset cache directory to use."; // Framework
     cmdLineDescs.commands["--clear-asset-cache"] = "At the start of Tundra, remove all data and metadata files from asset cache."; // AssetCache
-    cmdLineDescs.commands["--loglevel"] = "Sets the current log level: 'error', 'warning', 'info', 'debug'."; // ConsoleAPI
-    cmdLineDescs.commands["--logfile"] = "Sets logging file. Usage example: '--logfile TundraLogFile.txt'."; // ConsoleAPI
-    cmdLineDescs.commands["--physicsrate"] = "Specifies the number of physics simulation steps per second. Default: 60."; // PhysicsModule
-    cmdLineDescs.commands["--physicsmaxsteps"] = "Specifies the maximum number of physics simulation steps in one frame to limit CPU usage. If the limit would be exceeded, physics will appear to slow down. Default: 6."; // PhysicsModule
+    cmdLineDescs.commands["--logLevel"] = "Sets the current log level: 'error', 'warning', 'info', 'debug'."; // ConsoleAPI
+    cmdLineDescs.commands["--logFile"] = "Sets logging file. Usage example: '--logfile TundraLogFile.txt'."; // ConsoleAPI
+    cmdLineDescs.commands["--physicsRate"] = "Specifies the number of physics simulation steps per second. Default: 60."; // PhysicsModule
+    cmdLineDescs.commands["--physicsMaxSteps"] = "Specifies the maximum number of physics simulation steps in one frame to limit CPU usage. If the limit would be exceeded, physics will appear to slow down. Default: 6."; // PhysicsModule
     cmdLineDescs.commands["--splash"] = "Shows splash screen during the startup."; // Framework
     cmdLineDescs.commands["--fullscreen"] = "Starts application in fullscreen mode."; // OgreRenderingModule
     cmdLineDescs.commands["--vsync"] = "Synchronizes buffer swaps to monitor vsync, eliminating tearing at the expense of a fixed frame rate."; // OgreRenderingModule
     cmdLineDescs.commands["--vsyncFrequency"] = "Sets display frequency rate for vsync, applicable only if fullscreen is set. Usage: '--vsyncFrequency <number>'."; // OgreRenderingModule
     cmdLineDescs.commands["--antialias"] = "Sets full screen antialiasing factor. Usage '--antialias <number>'."; // OgreRenderingModule
     cmdLineDescs.commands["--hide_benign_ogre_messages"] = "Sets some uninformative Ogre log messages to be ignored from the log output."; // OgreRenderingModule
+    cmdLineDescs.commands["--no_async_asset_load"] = "Disables threaded loading of Ogre assets."; // OgreRenderingModule
+    cmdLineDescs.commands["--autoDxtCompress"] = "Compress uncompressed texture assets to DXT1/DXT5 format on load to save memory."; // OgreRenderingModule
+    cmdLineDescs.commands["--maxTextureSize"] = "Resize texture assets that are larger than this. Default: no resizing."; // OgreRenderingModule
+    cmdLineDescs.commands["--variablePhysicsStep"] = "Use variable physics timestep to avoid taking multiple physics substeps during one frame."; // PhysicsModule
+    cmdLineDescs.commands["--opengl"] = "Use Ogre with \"OpenGL Rendering Subsystem\" for rendering, overrides the option that was set in config.";
+    cmdLineDescs.commands["--nullRenderer"] = "Disables all Ogre rendering operations."; // OgreRenderingModule
+    cmdLineDescs.commands["--ogreCaptureTopWindow"] = "On some systems, the Ogre rendering output is overdrawn by the desktop compositing manager, "
+        "but the actual cause of this is uncertain. As a workaround, try this switch to make Ogre output directly on the main window handle of the UI chain. "
+        "However, this might introduce graphical issues."; // OgreRenderingModule
+    cmdLineDescs.commands["--noUiCompositing"] = "Disables the UI compositing, use for debugging purposes only."; // Framework & OgreRenderingModule
+    cmdLineDescs.commands["--noCentralWidget"] = "Disables the usage of QMainWindow's central widget."; // Framework
+    cmdLineDescs.commands["--noMenuBar"] = "Disables showing of the application menu bar automatically."; // Framework
+    cmdLineDescs.commands["--clientExtrapolationTime"] = "Rigidbody extrapolation time on client in milliseconds. Default 66."; // TundraProtocolModule
+    cmdLineDescs.commands["--noClientPhysics"] = "Disables rigidbody handoff to client simulation after no movement packets received from server."; // TundraProtocolModule
+    
+    apiVersionInfo = new VersionInfo(Application::Version());
+    applicationVersionInfo = new VersionInfo(Application::Version());
 
-    apiVersionInfo = new ApiVersionInfo(Application::Version());
-    applicationVersionInfo = new ApplicationVersionInfo(Application::OrganizationName(), Application::ApplicationName(), Application::Version());
-
-    LogInfo("* API version         : " + apiVersionInfo->GetFullIdentifier());
+    LogInfo("* API version         : " + apiVersionInfo->Version());
     LogInfo("* Application version : " + Application::FullIdentifier());
 
     if (HasCommandLineParameter("--help"))
@@ -249,7 +270,8 @@ Framework::Framework(int argc_, char** argv_) :
     input = new InputAPI(this);
     console = new ConsoleAPI(this);
     console->RegisterCommand("exit", "Shuts down gracefully.", this, SLOT(Exit()));
-    console->RegisterCommand("inputcontexts", "Prints all currently registered input contexts in InputAPI.", input, SLOT(DumpInputContexts()));
+    console->RegisterCommand("inputContexts", "Prints all currently registered input contexts in InputAPI.", input, SLOT(DumpInputContexts()));
+    console->RegisterCommand("dynamicObjects", "Prints all currently registered dynamic objets in Framework.", this, SLOT(PrintDynamicObjects()));
 
     /// @todo Remove when SceneInteract is moved out of the core.
     scene->GetSceneInteract()->Initialize(this);
@@ -490,12 +512,12 @@ IRenderer *Framework::Renderer() const
     return renderer;
 }
 
-ApiVersionInfo *Framework::ApiVersion() const
+VersionInfo *Framework::ApiVersion() const
 {
     return apiVersionInfo;
 }
 
-ApplicationVersionInfo *Framework::ApplicationVersion() const
+VersionInfo *Framework::ApplicationVersion() const
 {
     return applicationVersionInfo;
 }
@@ -523,11 +545,15 @@ IModule *Framework::GetModuleByName(const QString &name) const
 bool Framework::RegisterDynamicObject(QString name, QObject *object)
 {
     if (name.length() == 0 || !object)
+    {
+        LogError("Framework::RegisterDynamicObject: empty name or null object passed.");
         return false;
-
-    // We never override a property if it already exists.
-    if (property(name.toStdString().c_str()).isValid())
+    }
+    if (property(name.toStdString().c_str()).isValid()) // We never override a property if it already exists.
+    {
+        LogError(QString("Framework::RegisterDynamicObject: Dynamic object with name \"%1\" already registered.").arg(name));
         return false;
+    }
 
     setProperty(name.toStdString().c_str(), QVariant::fromValue<QObject*>(object));
 
@@ -584,6 +610,7 @@ void Framework::LoadStartupOptionsFromXML(QString configurationFile)
 
 bool Framework::HasCommandLineParameter(const QString &value) const
 {
+    ///\todo Convert startupOptions to a key-value map.
     for(int i = 0; i < startupOptions.size(); ++i)
         if (!startupOptions[i].compare(value, Qt::CaseInsensitive))
             return true;
@@ -592,6 +619,8 @@ bool Framework::HasCommandLineParameter(const QString &value) const
 
 QStringList Framework::CommandLineParameters(const QString &key) const
 {
+    ///\todo Remove all this logic. This is Win32-specific command line parsing, and should be done only once for Win32,
+    /// and stored in an already processed format for faster retrieval.
     QStringList ret;
     for(int i = 0; i+1 < startupOptions.size(); ++i)
     {
@@ -670,4 +699,11 @@ void Framework::PrintStartupOptions()
             ++i;
         }
     }
+}
+
+void Framework::PrintDynamicObjects()
+{
+    LogInfo("Dynamic objects:");
+    foreach(const QByteArray &obj, dynamicPropertyNames())
+        LogInfo(QString(obj));
 }

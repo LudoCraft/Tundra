@@ -42,7 +42,7 @@ Client::~Client()
 {
 }
 
-void Client::Update(f64 frametime)
+void Client::Update(f64 /*frametime*/)
 {
     // If we aren't a server, check pending login
     if (!owner_->IsServer())
@@ -76,7 +76,7 @@ void Client::Login(const QUrl& loginUrl)
     }
 
     // Parse values from url
-    QByteArray username = loginUrl.queryItemValue("username").toUtf8();
+    QString username = loginUrl.queryItemValue("username");
     QString password = loginUrl.queryItemValue("password");
     QString protocol = loginUrl.queryItemValue("protocol");
     QString address = loginUrl.host();
@@ -84,12 +84,19 @@ void Client::Login(const QUrl& loginUrl)
 
     // If the username is more exotic or has spaces, prefer 
     // decoding the percent encoding before it is sent to the server.
-    if (username.contains('%'))
-        username = QByteArray::fromPercentEncoding(username);
+    QByteArray utfUsername = loginUrl.queryItemValue("username").toUtf8();
+    if (utfUsername.contains('%'))
+    {
+        // Use QUrl to decode percent encoding instead of QByteArray.
+        username = QUrl::fromEncoded(utfUsername).toString();
+    }
 
     // Validation: Username and address is the minimal set that with we can login with
     if (username.isEmpty() || address.isEmpty())
+    {
+        ::LogError("Client::Login: Cannot log to server, no username defined in login url: " + loginUrl.toString());
         return;
+    }
     if (port < 0)
         port = 2345;
 
@@ -189,7 +196,7 @@ void Client::DoLogout(bool fail)
     
     if (fail)
     {
-        QString failreason = GetLoginProperty("LoginFailed");
+        QString failreason = LoginProperty("LoginFailed");
         emit LoginFailed(failreason);
     }
     else // An user deliberately disconnected from the world, and not due to a connection error.
@@ -222,10 +229,10 @@ void Client::SetLoginProperty(QString key, QString value)
     properties[key] = value;
 }
 
-QString Client::GetLoginProperty(QString key) const
+QString Client::LoginProperty(QString key) const
 {
     key = key.trimmed();
-    std::map<QString, QString>::const_iterator i = properties.find(key);
+    LoginPropertyMap::const_iterator i = properties.find(key);
     if (i != properties.end())
         return i->second;
     else
@@ -236,7 +243,7 @@ QString Client::LoginPropertiesAsXml() const
 {
     QDomDocument xml;
     QDomElement rootElem = xml.createElement("login");
-    for(std::map<QString, QString>::const_iterator iter = properties.begin(); iter != properties.end(); ++iter)
+    for(LoginPropertyMap::const_iterator iter = properties.begin(); iter != properties.end(); ++iter)
     {
         QDomElement elem = xml.createElement(iter->first);
         elem.setAttribute("value", iter->second);
@@ -278,9 +285,9 @@ kNet::MessageConnection* Client::GetConnection()
 void Client::OnConnectionAttemptFailed()
 {
     // Provide a reason why the connection failed.
-    QString address = GetLoginProperty("address");
-    QString port = GetLoginProperty("port");
-    QString protocol = GetLoginProperty("protocol");
+    QString address = LoginProperty("address");
+    QString port = LoginProperty("port");
+    QString protocol = LoginProperty("protocol");
 
     QString failReason = "Could not connect to host";
     if (!address.isEmpty())

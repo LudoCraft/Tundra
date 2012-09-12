@@ -20,58 +20,59 @@ namespace Ogre
 }
 
 /// Ogre camera entity component
-/**
-<table class="header">
-<tr>
-<td>
-<h2>OgreCamera</h2>
-Ogre camera entity component
-Needs to be attached to a placeable (aka scene node) to be useful.
+/** <table class="header">
+    <tr>
+    <td>
+    <h2>Camera</h2>
+    Ogre camera entity component
+    Needs to be attached to a placeable (aka scene node) to be useful.
 
-Registered by OgreRenderer::OgreRenderingModule.
+    Registered by OgreRenderer::OgreRenderingModule.
 
-\ingroup OgreRenderingModuleClient
+    \ingroup OgreRenderingModuleClient
 
-<b>Attributes</b>:
-<ul>
-<li>float3: upVector
-<div>Up vector that defines the yaw axis.</div>
-<li>float: nearPlane
-<div>Near clip distance.</div>
-<li>float: farPlane
-<div>Far clip distance.</div>
-<li>float3: verticalFov
-<div>Vertical field of view as degrees.</div>
-<li>QString: aspectRatio
-<div>Aspect ratio is a string of form "<widthProportion>:<heightProportion>", e.g. "4:3".</div>
-</ul>
+    <b>Attributes</b>:
+    <ul>
+    <li>float3: upVector
+    <div> @copydoc .</div>
+    <li>float: nearPlane
+    <div> @copydoc </div>
+    <li>float: farPlane
+    <div> @copydoc </div>
+    <li>float3: verticalFov
+    <div> @copydoc </div>
+    <li>QString: aspectRatio
+    <div> @copydoc </div>
+    </ul>
 
-<b>Exposes the following scriptable functions:</b>
-<ul>
-<li>"SetActive": sets as active camera in the viewport
-<li>"IsActive": returns whether camera is active in the viewport
-<li>"InitialRotation": returns initial Euler rotation according to the up vector.
-<li>"AdjustedRotation": returns an adjusted Euler rotation according to the up vector.
-<li>"GetMouseRay": Returns a world space ray as cast from the camera through a viewport position.
-<li>"AspectRatio": Returns the currently used view aspect ratio (width/height).
-<li>"VisibleEntities": Returns visible entities in the camera's frustum.
-<li>"VisibleEntityIDs": Returns entity IDs of visible entities in the camera's frustum.
-<li>"StartViewTracking": Starts tracking an entity's visibility within the scene using this camera.
-<li>"StopViewTracking": Stops tracking an entity's visibility.
-<li>"AspectRatio": Returns the currently used view aspect ratio (width/height).
-</ul>
+    <b>Exposes the following scriptable functions:</b>
+    <ul>
+    <li>"SetActive": @copydoc SetActive
+    <li>"IsActive": @copydoc IsActive
+    <li>"InitialRotation": @copydoc InitialRotation
+    <li>"AdjustedRotation": @copydoc AdjustedRotation
+    <li>"GetMouseRay": @copydoc GetMouseRay
+    <li>"AspectRatio": @copydoc AspectRatio
+    <li>"VisibleEntities": @copydoc VisibleEntities
+    <li>"VisibleEntityIDs": @copydoc VisibleEntityIDs
+    <li>"StartViewTracking": @copydoc StartViewTracking
+    <li>"StopViewTracking": @copydoc StopViewTracking
+    <li>"AspectRatio": @copydoc AspectRatio
+    <li>"ViewMatrix": @copydoc ViewMatrix
+    <li>"ProjectionMatrix": @copydoc ProjectionMatrix
+    </ul>
 
-<b>Reacts on the following actions:</b>
-<ul>
-<li>...
-</ul>
-</td>
-</tr>
+    <b>Reacts on the following actions:</b>
+    <ul>
+    <li>...
+    </ul>
+    </td>
+    </tr>
 
-Does not emit any actions.
+    Does not emit any actions.
 
-<b>Depends on the component Placeable</b>.
-</table> */
+    <b>Depends on the component @ref EC_ Placeable "Placeable".</b>
+    </table> */
 class OGRE_MODULE_API EC_Camera : public IComponent
 {
     Q_OBJECT
@@ -120,30 +121,6 @@ public slots:
     /// Adjust a pitch/yaw/roll Euler rotation vector using the up vector
     float3 AdjustedRotation(const float3& rotation) const;
 
-    /// Sets near clip distance
-    /** @param nearclip new near clip distance */
-    ///\todo Remove, exposed as Attribute nearPlane
-    void SetNearClip(float nearclip);
-    /// returns near clip distance
-    ///\todo Remove, exposed as Attribute nearPlane
-    float NearClip() const;
-
-    /// sets far clip distance
-    /** @param farclip new far clip distance */
-    ///\todo Remove, exposed as Attribute farPlane
-    void SetFarClip(float farclip);
-    /// returns far clip distance
-    ///\todo Remove, exposed as Attribute farPlane
-    float FarClip() const;
-
-    /// Sets vertical fov 
-    /** @param fov new vertical fov in radians  */
-    ///\todo Remove, exposed as Attribute verticalFov
-    void SetVerticalFov(float fov);
-    /// returns vertical fov as radians
-    ///\todo Remove, exposed as Attribute verticalFov
-    float VerticalFov() const;
-
     /// Returns the currently used view aspect ratio (width/height).
     float AspectRatio() const;
 
@@ -160,25 +137,25 @@ public slots:
     /// Returns entity IDs of visible entities in the camera's frustum.
     const std::set<entity_id_t>& VisibleEntityIDs();
 
-    /// Takes a screen shot to hard drive. Store location will be users app data directory 
-    /// to make the function script safe. The name will have a timestamp identifier. 
-    /// You can rename/remove etc. the file after this function returns to make it suitable for you usage.
-    /// Tundra rendering viewport size is used as the image size. If you want to a spesific sized image use ToQImage()
-    /// function and resize the returned image to suit your needs.
-    /// @return Absolute filepath to the image file. Empty string if operation fails.
-    /// @note The timestamp format is yyyy-MM-dd-hh:mm. Image format is PNG.
+    /// Takes a screen shot to hard drive.
+    /** Store location will be users app data directory to make the function script safe. The name will have a timestamp identifier. 
+        You can rename/remove etc. the file after this function returns to make it suitable for you usage.
+        Tundra rendering viewport size is used as the image size. If you want to a spesific sized image use ToQImage()
+        function and resize the returned image to suit your needs.
+        @return Absolute filepath to the image file. Empty string if operation fails.
+        @note The timestamp format is yyyy-MM-dd-hh:mm. Image format is PNG. */
     QString SaveScreenshot(bool renderUi = true);
 
-    /// Render current view to a QImage. Returns null QImage if operation fails. 
-    /// Tundra rendering viewport size is used as the image size.
-    /// @param renderUi If the image should have the user interface included.
-    /// @return The render result image.
+    /// Renders current view to a QImage.
+    /** Tundra rendering viewport size is used as the image size.
+        @param renderUi If the image should have the user interface included.
+        @return The render result image, null QImage if operation fails. */
     QImage ToQImage(bool renderUi = true);
    
     /// Render current view to a Ogre::Image. Returns null Ogre::Image if operation fails.
-    /// Tundra rendering viewport size is used as the image size.
-    /// @param renderUi If the image should have the user interface included.
-    /// @return The render result image.
+    /** Tundra rendering viewport size is used as the image size.
+        @param renderUi If the image should have the user interface included.
+        @return The render result image. */
     Ogre::Image ToOgreImage(bool renderUi = true);
 
     /// Returns a world space ray as cast from the camera through a viewport position.
@@ -193,6 +170,13 @@ public slots:
 
     /// Stops tracking an entity's visibility
     void StopViewTracking(Entity* entity);
+
+    void SetNearClip(float nearclip); /**< @deprecated use attribute nearPlane @todo Remove */
+    float NearClip() const; /**< @deprecated use attribute nearPlane @todo Remove */
+    void SetFarClip(float farclip); ///< @deprecated use attribute farPlane @todo Remove */
+    float FarClip() const; /**< @deprecated use attribute farPlane @todo Remove */
+    void SetVerticalFov(float fov); /**< @deprecated use attribute verticalFov @todo Remove */
+    float VerticalFov() const; /**< @deprecated use attribute verticalFov @todo Remove */
 
 signals:
     /// An entity has entered the view

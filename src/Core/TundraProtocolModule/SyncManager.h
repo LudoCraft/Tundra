@@ -7,8 +7,9 @@
 #include "SceneFwd.h"
 #include "AttributeChangeType.h"
 #include "EntityAction.h"
-#include "kNetFwd.h"
-#include "kNet/Types.h"
+
+#include <kNetFwd.h>
+#include <kNet/Types.h>
 
 #include <QObject>
 
@@ -22,12 +23,9 @@ namespace TundraLogic
 class SyncManager : public QObject
 {
     Q_OBJECT
-    
+
 public:
-    /// Constructor
     explicit SyncManager(TundraLogicModule* owner);
-    
-    /// Destructor
     ~SyncManager();
     
     /// Register to entity/component change signals from a specific scene and start syncing them
@@ -37,26 +35,20 @@ public:
     void Update(f64 frametime);
     
     /// Create new replication state for user and dirty it (server operation only)
-    void NewUserConnected(UserConnection* user);
-        
+    void NewUserConnected(const UserConnectionPtr &user);
+
 public slots:
     /// Set update period (seconds)
     void SetUpdatePeriod(float period);
-    
+
     /// Get update period
-    float GetUpdatePeriod() { return updatePeriod_; }
+    float GetUpdatePeriod() const { return updatePeriod_; }
 
     /// Returns SceneSyncState for a client connection.
-    /// @note This slot is only exposed on Server, other wise will return 0.
-    /// @param int connection ID of the client.
-    /// @return SceneSyncState* State.
-    SceneSyncState* SceneState(int connectionId);
-
-    /// Returns SceneSyncState for a client connection.
-    /// @note This slot is only exposed on Server, other wise will return 0.
-    /// @param UserConnection* Client connection ptr.
-    /// @return SceneSyncState* State.
-    SceneSyncState* SceneState(UserConnection *connection);
+    /** @note This slot is only exposed on Server, other wise will return null ptr.
+        @param int connection ID of the client. */
+    SceneSyncState* SceneState(int connectionId) const;
+    SceneSyncState* SceneState(const UserConnectionPtr &connection) const; /**< @overload @param connection Client connection.*/
 
 signals:
     /// This signal is emitted when a new user connects and a new SceneSyncState is created for the connection.
@@ -128,6 +120,9 @@ private:
 
     void InterpolateRigidBodies(f64 frametime, SceneSyncState* state);
 
+    /// Read client extrapolation time parameter from command line and match it to the current sync period.
+    void GetClientExtrapolationTime();
+
     /// Process one sync state for changes in the scene
     /** \todo For now, sends all changed entities/components. In the future, this shall be subject to interest management
         @param destination MessageConnection where to send the messages
@@ -159,6 +154,11 @@ private:
     float updatePeriod_;
     /// Time accumulator for update
     float updateAcc_;
+    
+    /// Physics client interpolation/extrapolation period length as number of network update intervals (default 3)
+    float maxLinExtrapTime_;
+    /// Disable client physics handoff -flag
+    bool noClientPhysicsHandoff_;
     
     /// Server sync state (client only)
     SceneSyncState server_syncstate_;

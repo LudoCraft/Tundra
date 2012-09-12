@@ -3,6 +3,7 @@
 #include "DebugOperatorNew.h"
 
 #include "AssetAPI.h"
+#include "CoreDefines.h"
 #include "IAssetTransfer.h"
 #include "IAsset.h"
 #include "IAssetStorage.h"
@@ -59,7 +60,7 @@ void AssetAPI::OpenAssetCache(QString directory)
     }
 }
 
-std::vector<AssetProviderPtr> AssetAPI::GetAssetProviders() const
+std::vector<AssetProviderPtr> AssetAPI::AssetProviders() const
 {
     return providers;
 }
@@ -77,7 +78,7 @@ void AssetAPI::RegisterAssetProvider(AssetProviderPtr provider)
     providers.push_back(provider);
 }
 
-AssetStoragePtr AssetAPI::GetAssetStorageByName(const QString &name) const
+AssetStoragePtr AssetAPI::AssetStorageByName(const QString &name) const
 {
     foreach(AssetProviderPtr provider, GetAssetProviders())
         foreach(AssetStoragePtr storage, provider->GetStorages())
@@ -86,7 +87,7 @@ AssetStoragePtr AssetAPI::GetAssetStorageByName(const QString &name) const
     return AssetStoragePtr();
 }
 
-AssetStoragePtr AssetAPI::GetStorageForAssetRef(const QString &ref) const
+AssetStoragePtr AssetAPI::StorageForAssetRef(const QString &ref) const
 {
     PROFILE(AssetAPI_GetStorageForAssetRef);
     foreach(AssetProviderPtr provider, GetAssetProviders())
@@ -127,7 +128,7 @@ AssetStoragePtr AssetAPI::DeserializeAssetStorageFromString(const QString &stora
     return AssetStoragePtr();
 }
 
-AssetStoragePtr AssetAPI::GetDefaultAssetStorage() const
+AssetStoragePtr AssetAPI::DefaultAssetStorage() const
 {
     AssetStoragePtr defStorage = defaultStorage.lock();
     if (defStorage)
@@ -150,25 +151,20 @@ void AssetAPI::SetDefaultAssetStorage(const AssetStoragePtr &storage)
         LogInfo("Set (null) as the default asset storage.");
 }
 
-AssetMap AssetAPI::GetAllAssetsOfType(const QString& type)
+AssetMap AssetAPI::AssetsOfType(const QString& type) const
 {
     AssetMap ret;
-    
-    for (AssetMap::const_iterator i = assets.begin(); i != assets.end(); ++i)
-    {
+    for(AssetMap::const_iterator i = assets.begin(); i != assets.end(); ++i)
         if (!i->second->Type().compare(type, Qt::CaseInsensitive))
             ret[i->first] = i->second;
-    }
-    
     return ret;
 }
 
-std::vector<AssetStoragePtr> AssetAPI::GetAssetStorages() const
+std::vector<AssetStoragePtr> AssetAPI::AssetStorages() const
 {
     std::vector<AssetStoragePtr> storages;
 
     std::vector<AssetProviderPtr> providers = GetAssetProviders();
-
     for(size_t i = 0; i < providers.size(); ++i)
     {
         std::vector<AssetStoragePtr> stores = providers[i]->GetStorages();
@@ -778,7 +774,7 @@ AssetTransferPtr AssetAPI::RequestAsset(QString assetRef, QString assetType, boo
     }
     transfer->provider = provider;
     transfer->asset = existing; // Fill the asset if it exists in the system
-    
+
     // Store the newly allocated AssetTransfer internally, so that any duplicated requests to this asset will return the same request pointer,
     // so we'll avoid multiple downloads to the exact same asset.
     assert(currentTransfers.find(assetRef) == currentTransfers.end());
@@ -791,7 +787,7 @@ AssetTransferPtr AssetAPI::RequestAsset(const AssetReference &ref, bool forceTra
     return RequestAsset(ref.ref, ref.type, forceTransfer);
 }
 
-AssetProviderPtr AssetAPI::GetProviderForAssetRef(QString assetRef, QString assetType) const
+AssetProviderPtr AssetAPI::ProviderForAssetRef(QString assetRef, QString assetType) const
 {
     PROFILE(AssetAPI_GetProviderForAssetRef);
 
@@ -893,12 +889,6 @@ QString AssetAPI::ResolveAssetRef(QString context, QString assetRef) const
     }
     assert(false);
     return assetRef;
-}
-
-bool AssetAPI::IsAssetTypeFactoryRegistered(const QString &typeName) const
-{
-    AssetTypeFactoryPtr existingFactory = GetAssetTypeFactory(typeName);
-    return (existingFactory.get() ? true : false);
 }
 
 void AssetAPI::RegisterAssetTypeFactory(AssetTypeFactoryPtr factory)
@@ -1023,7 +1013,7 @@ AssetPtr AssetAPI::CreateNewAsset(QString type, QString name, AssetStoragePtr st
     return asset;
 }
 
-AssetTypeFactoryPtr AssetAPI::GetAssetTypeFactory(QString typeName) const
+AssetTypeFactoryPtr AssetAPI::AssetTypeFactory(QString typeName) const
 {
     PROFILE(AssetAPI_GetAssetTypeFactory);
     for(size_t i = 0; i < assetTypeFactories.size(); ++i)
@@ -1161,7 +1151,9 @@ void AssetAPI::AssetTransferCompleted(IAssetTransfer *transfer_)
         transfer->EmitAssetDownloaded();
         transfer->EmitTransferSucceeded();
         pendingDownloadRequests.erase(transfer->source.ref);
-        currentTransfers.erase(transfer->source.ref);
+        AssetTransferMap::iterator iter = FindTransferIterator(transfer.get());
+        if (iter != currentTransfers.end())
+            currentTransfers.erase(iter);
         return;
     }
 
@@ -1203,7 +1195,10 @@ void AssetAPI::AssetTransferCompleted(IAssetTransfer *transfer_)
     transfer->EmitAssetDownloaded();
 
     const u8 *data = (transfer->rawAssetData.size() > 0 ? &transfer->rawAssetData[0] : 0);
-    transfer->asset->LoadFromFileInMemory(data, transfer->rawAssetData.size());
+    if (data)
+        transfer->asset->LoadFromFileInMemory(data, transfer->rawAssetData.size());
+    else
+        transfer->asset->LoadFromFile(transfer->asset->DiskSource());
 
     //bool success = transfer->asset->LoadFromFileInMemory(data, transfer->rawAssetData.size());
     //if (!success)
@@ -1282,24 +1277,34 @@ void AssetAPI::AssetLoadCompleted(const QString assetRef)
         const QString diskSource = asset->DiskSource();
         if (diskSourceChangeWatcher && !diskSource.isEmpty())
         {
+            PROFILE(AssetAPI_AssetLoadCompleted_DiskWatcherSetup);
+
             // If available, check the storage whether assets loaded from it should be live-updated.
-            // Otherwise assume live-update == true
             
-            bool shouldLiveUpdate = true;
+            // By default disable liveupdate for all assets which come outside any known Tundra asset storage.
+            // This is because the feature is most likely not used, and setting up the watcher below consumes
+            // system resources and CPU time. To enable the disk watcher, make sure that the asset comes from
+            // a storage known to Tundra and set liveupdate==true for that asset storage.
+            // Note that this means that also local assets outside all storages with absolute path names like 
+            // 'C:\mypath\asset.png' will always have liveupdate disabled.
             AssetStoragePtr storage = asset->GetAssetStorage();
             if (storage)
-                shouldLiveUpdate = storage->HasLiveUpdate();
-
-            // Localassetprovider implements its own watcher. Therefore only add paths which refer to the assetcache to the AssetAPI watcher
-            if (!assetCache || !diskSource.startsWith(assetCache->CacheDirectory(), Qt::CaseInsensitive))
-                shouldLiveUpdate = false;
-            
-            if (shouldLiveUpdate)
             {
-                diskSourceChangeWatcher->removePath(diskSource);
-                diskSourceChangeWatcher->addPath(diskSource);
+                bool shouldLiveUpdate = storage->HasLiveUpdate();
+
+                // Localassetprovider implements its own watcher. Therefore only add paths which refer to the assetcache to the AssetAPI watcher
+                if (shouldLiveUpdate && (!assetCache || !diskSource.startsWith(assetCache->CacheDirectory(), Qt::CaseInsensitive)))
+                    shouldLiveUpdate = false;
+
+                if (shouldLiveUpdate)
+                {
+                    diskSourceChangeWatcher->removePath(diskSource);
+                    diskSourceChangeWatcher->addPath(diskSource);
+                }
             }
         }
+
+        PROFILE(AssetAPI_AssetLoadCompleted_ProcessDependencies);
 
         // If this asset depends on any other assets, we have to make asset requests for those assets as well (and all assets that they refer to, and so on).
         RequestAssetDependencies(asset);
@@ -1307,7 +1312,7 @@ void AssetAPI::AssetLoadCompleted(const QString assetRef)
         // If we don't have any outstanding dependencies 
         // for the transfer, succeed and remove the transfer
         if (iter != currentTransfers.end())
-            if (NumPendingDependencies(asset) == 0)
+            if (!HasPendingDependencies(asset))
                 AssetDependenciesCompleted(iter->second);
     }
     else
@@ -1334,21 +1339,28 @@ void AssetAPI::AssetLoadFailed(const QString assetRef)
 
 void AssetAPI::AssetUploadTransferCompleted(IAssetUploadTransfer *uploadTransfer)
 {
-    uploadTransfer->EmitTransferCompleted();
-
     QString assetRef = uploadTransfer->AssetRef();
+    
+    // Clear our cache of this data.
+    /// @note We could actually update our cache with the same version of the asset that we just uploaded,
+    /// to avoid downloading what we just uploaded. That can be implemented later.
+    if (assetCache)
+        assetCache->DeleteAsset(assetRef);
+    
+    // If we have the asset (with possible old contents) in memory, unload it now
+    {
+        AssetPtr asset = GetAsset(assetRef);
+        if (asset && asset->IsLoaded())
+            asset->Unload();
+    }
+    
+    uploadTransfer->EmitTransferCompleted();
     
     emit AssetUploaded(assetRef);
     
     // We've completed an asset upload transfer. See if there is an asset download transfer that is waiting
     // for this upload to complete. 
     
-    // Before issuing a request, clear our cache of this data.
-    /// @note We could actually update our cache with the same version of the asset that we just uploaded,
-    /// to avoid downloading what we just uploaded. That can be implemented later.
-    if (assetCache)
-        assetCache->DeleteAsset(assetRef);
-
     currentUploadTransfers.erase(assetRef); // Note: this might kill the 'transfer' ptr if we were the last one to hold on to it. Don't dereference transfer below this.
     PendingDownloadRequestMap::iterator iter = pendingDownloadRequests.find(assetRef);
     if (iter != pendingDownloadRequests.end())
@@ -1366,6 +1378,7 @@ void AssetAPI::AssetUploadTransferCompleted(IAssetUploadTransfer *uploadTransfer
 
 void AssetAPI::AssetDependenciesCompleted(AssetTransferPtr transfer)
 {
+    PROFILE(AssetAPI_AssetDependenciesCompleted);
     // Emit success for this transfer
     transfer->EmitTransferSucceeded();
     
@@ -1376,12 +1389,6 @@ void AssetAPI::AssetDependenciesCompleted(AssetTransferPtr transfer)
     else // Even if we didn't know about this transfer, just print a warning and continue execution here nevertheless.
         LogError("AssetAPI: Asset \"" + transfer->assetType + "\", name \"" + transfer->source.ref + "\" transfer finished, but no corresponding AssetTransferPtr was tracked by AssetAPI!");
 
-    if (transfer->rawAssetData.size() == 0)
-    {
-        LogError("AssetAPI: Asset \"" + transfer->assetType + "\", name \"" + transfer->source.ref + "\" transfer finished: but data size was 0 bytes!");
-        return;
-    }
-    
     pendingDownloadRequests.erase(transfer->source.ref);
 }
 
@@ -1407,6 +1414,7 @@ void AssetAPI::NotifyAssetDependenciesChanged(AssetPtr asset)
 
 void AssetAPI::RequestAssetDependencies(AssetPtr asset)
 {
+    PROFILE(AssetAPI_RequestAssetDependencies);
     // Make sure we have most up-to-date internal view of the asset dependencies.
     NotifyAssetDependenciesChanged(asset);
 
@@ -1428,6 +1436,7 @@ void AssetAPI::RequestAssetDependencies(AssetPtr asset)
 
 void AssetAPI::RemoveAssetDependencies(QString asset)
 {
+    PROFILE(AssetAPI_RemoveAssetDependencies);
     for(size_t i = 0; i < assetDependencies.size(); ++i)
         if (QString::compare(assetDependencies[i].first, asset, Qt::CaseInsensitive) == 0)
         {
@@ -1455,6 +1464,7 @@ std::vector<AssetPtr> AssetAPI::FindDependents(QString dependee)
 
 int AssetAPI::NumPendingDependencies(AssetPtr asset) const
 {
+    PROFILE(AssetAPI_NumPendingDependencies);
     int numDependencies = 0;
 
     std::vector<AssetReference> refs = asset->FindReferences();
@@ -1492,6 +1502,44 @@ int AssetAPI::NumPendingDependencies(AssetPtr asset) const
     }
 
     return numDependencies;
+}
+
+bool AssetAPI::HasPendingDependencies(AssetPtr asset) const
+{
+    PROFILE(AssetAPI_HasPendingDependencies);
+
+    std::vector<AssetReference> refs = asset->FindReferences();
+    for(size_t i = 0; i < refs.size(); ++i)
+    {
+        if (refs[i].ref.isEmpty())
+            continue;
+
+        // We silently ignore this dependency if the asset type in question is disabled.
+        if (dynamic_cast<NullAssetFactory*>(GetAssetTypeFactory(GetResourceTypeFromAssetRef(refs[i])).get()))
+            continue;
+
+        AssetPtr existing = GetAsset(refs[i].ref);
+        if (!existing) // Not loaded, just mark the single one
+            return true;
+        else
+        {            
+            if (existing->IsEmpty())
+                return true; // If asset is empty, count it as an unloaded dependency
+            else
+            {
+                if (!existing->IsLoaded())
+                    return true;
+                // Ask the dependencies of the dependency, we want all of the asset
+                // down the chain to be loaded before we load the base asset
+                // Note: if the dependency is unloaded, it may or may not be able to tell the dependencies correctly
+                bool dependencyHasDependencies = HasPendingDependencies(existing);
+                if (dependencyHasDependencies)
+                    return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 void AssetAPI::HandleAssetDiscovery(const QString &assetRef, const QString &assetType)
@@ -1586,7 +1634,7 @@ void AssetAPI::OnAssetLoaded(AssetPtr asset)
         if (iter != currentTransfers.end())
         {
             AssetTransferPtr transfer = iter->second;
-            if (NumPendingDependencies(dependent) == 0)
+            if (!HasPendingDependencies(dependent))
                 AssetDependenciesCompleted(transfer);
         }
     }
@@ -1794,9 +1842,12 @@ QString AssetAPI::GetResourceTypeFromAssetRef(QString assetRef)
 
     if (file.endsWith(".ui", Qt::CaseInsensitive))
         return "QtUiFile";
-        
+
     if (file.endsWith(".avatar", Qt::CaseInsensitive))
         return "Avatar";
+
+    if (file.endsWith(".attachment", Qt::CaseInsensitive))
+        return "AvatarAttachment";
 
     if (file.endsWith(".pdf", Qt::CaseInsensitive))
         return "PdfAsset";

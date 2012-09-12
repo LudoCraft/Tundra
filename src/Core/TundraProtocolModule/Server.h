@@ -33,55 +33,27 @@ public:
     void Update(f64 frametime);
 
     /// Get matching userconnection from a messageconnection, or null if unknown
-    /// @todo Rename to UserConnectionForMessageConnection or similar.
-    UserConnection* GetUserConnection(kNet::MessageConnection* source) const;
+    /// @todo Rename to UserConnection(ForMessageConnection) or similar.
+    UserConnectionPtr GetUserConnection(kNet::MessageConnection* source) const;
 
     /// Get all connected users
-    /// @todo Rename to UserConnections
-    UserConnectionList& GetUserConnections() const;
-
-    /// Get all authenticated users
-    /// @todo Rename to AuthenticatedUsers
-    UserConnectionList GetAuthenticatedUsers() const;
+    UserConnectionList& UserConnections() const;
 
     /// Set current action sender. Called by SyncManager
-    void SetActionSender(UserConnection* user);
+    void SetActionSender(const UserConnectionPtr &user);
 
     /// Returns the backend server object.
     /** Use this object to Broadcast messages to all currently connected clients.
-        @todo Rename to (KNet)Server or similar. */
+        @todo Rename to (KNet)NetworkServer or similar. */
     kNet::NetworkServer *GetServer() const;
 
     /// Returns server's port.
-    /** @return Server port number, or -1 if server is not running.
-        @todo Rename to Port */
+    /** @return Server port number, or -1 if server is not running. */
     int Port() const;
 
-    /** Returns server's protocol.
-        @return 'udp', tcp', or an empty string if server is not running.
-        @todo Rename to Protocol */
+    /// Returns server's protocol.
+    /** @return 'udp', tcp', or an empty string if server is not running. */
     QString Protocol() const;
-
-signals:
-    /// A user is connecting. This is your chance to deny access.
-    /** Call user->Disconnect() to deny access and kick the user out */ 
-    void UserAboutToConnect(int connectionID, UserConnection* connection);
-
-    /// A user has connected (and authenticated)
-    /** @param responseData The handler of this signal can add his own application-specific data to this structure. This data is sent to the
-        client and the applications on the client computer can read them as needed. */
-    void UserConnected(int connectionID, UserConnection* connection, UserConnectedResponseData *responseData);
-
-    void MessageReceived(UserConnection *connection, kNet::packet_id_t, kNet::message_id_t id, const char* data, size_t numBytes);
-
-    /// A user has disconnected
-    void UserDisconnected(int connectionID, UserConnection* connection);
-
-    /// The server has been started
-    void ServerStarted();
-
-    /// The server has been stopped
-    void ServerStopped();
 
 public slots:
     /// Create server scene & start server
@@ -92,33 +64,51 @@ public slots:
     /// Stop server & delete server scene
     void Stop();
 
-    /// Get whether server is running
+    /// Returns whether server is running
     bool IsRunning() const;
 
-    /// Get whether server is about to start.
+    /// Returns whether server is about to start.
     bool IsAboutToStart() const;
 
-    /// @todo Add deprecation warning print, and instructions to use 'port' property, and and remove this function.
-    int GetPort() const { return Port(); }
+    /// Returns all authenticated users.
+    UserConnectionList AuthenticatedUsers() const;
 
-    /// @todo Add deprecation warning print, and instructions to use 'protocol' property, and and remove this function.
-    QString GetProtocol() { return Protocol(); }
+    /// Returns connection corresponding to a connection ID.
+    /** @todo Rename to UserConnection or UserConnectionById. */
+    UserConnectionPtr GetUserConnection(int connectionID) const;
 
-    /// Get connected users' connection ID's
-    /** @todo This script-hack function is same as GetAuthenticatedUsers, remove this and expose UserConnectionList to QtScript. */
-    QVariantList GetConnectionIDs() const;
+    /// Returns current sender of an action.
+    /** Valid (non-null) only while an action packet is being handled. Null if it was invoked by server */
+    UserConnectionPtr ActionSender() const;
 
-    /// Get userconnection structure corresponding to connection ID
-    /** @todo Rename to UserConnectionById. */
-    UserConnection* GetUserConnection(int connectionID) const;
+    QVariantList GetConnectionIDs() const; /**< @deprecated Use AuthenticatedUsers. */
+    int GetPort() const; /**< @deprecated Use Port or 'port' property. */
+    QString GetProtocol() const; /**< @deprecated Use Protocol or 'protocol' property. */
+    UserConnectionPtr GetActionSender() const; /**< @deprecated Use ActionSender. */
 
-    /// Get current sender of an action.
-    /** Valid (non-null) only while an action packet is being handled. Null if it was invoked by server
-        @todo Rename to ActionSender. */
-    UserConnection* GetActionSender() const;
+signals:
+    /// A user is connecting. This is your chance to deny access.
+    /** Call user->Disconnect() to deny access and kick the user out.
+        @todo the connectionID parameter is unnecessary as it can be retrieved from connection. */
+    void UserAboutToConnect(int connectionID, UserConnection* connection);
 
-    /// Initialize server datatypes for a script engine
-    void OnScriptEngineCreated(QScriptEngine* engine);
+    /// A user has connected (and authenticated)
+    /** @param responseData The handler of this signal can add his own application-specific data to this structure.
+        This data is sent to the client and the applications on the client computer can read them as needed.
+        @todo the connectionID parameter is unnecessary as it can be retrieved from connection. */
+    void UserConnected(int connectionID, UserConnection* connection, UserConnectedResponseData *responseData);
+
+    void MessageReceived(UserConnection *connection, kNet::packet_id_t, kNet::message_id_t id, const char* data, size_t numBytes);
+
+    /// A user has disconnected
+    /** @todo the connectionID parameter is unnecessary as it can be retrieved from connection. */
+    void UserDisconnected(int connectionID, UserConnection* connection);
+
+    /// The server has been started
+    void ServerStarted();
+
+    /// The server has been stopped
+    void ServerStopped();
 
 private slots:
     /// Handle a Kristalli protocol message
@@ -127,11 +117,14 @@ private slots:
     /// Handle a user disconnecting
     void HandleUserDisconnected(UserConnection* user);
 
+    /// Initialize server datatypes for a script engine
+    void OnScriptEngineCreated(QScriptEngine* engine);
+
 private:
     /// Handle a login message
     void HandleLogin(kNet::MessageConnection* source, const MsgLogin& msg);
 
-    UserConnection* actionsender_;
+    UserConnectionWeakPtr actionSender;
     TundraLogicModule* owner_;
     Framework* framework_;
     int current_port_;

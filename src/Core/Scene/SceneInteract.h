@@ -1,9 +1,8 @@
 /**
- *  For conditions of distribution and use, see copyright notice in LICENSE
- *
- *  @file   SceneInteract.h
- *  @brief  Transforms generic mouse and keyboard input events on scene entities to input-related entity actions and signals.
- */
+    For conditions of distribution and use, see copyright notice in LICENSE
+
+    @file   SceneInteract.h
+    @brief  Transforms generic mouse and keyboard input events on scene entities to input-related entity actions and signals. */
 
 #pragma once
 
@@ -20,7 +19,7 @@
     <ul>
     <li>"MouseHoverIn" - Executed when mouse hover enters an entity.
     <div>No parameters.</div>
-    <li>CURRENTLY NOT EXECUTED "MouseHover" - Executed when mouse hovers on an entity.
+    <li>"MouseHover" - Executed when mouse hovers on an entity.
     <div>No parameters</div>
     <li>"MouseHoverOut" - Executed when mouse hover leaves an entity.
     <div></div>
@@ -42,7 +41,7 @@ public:
     void Initialize(Framework *framework);
 
 signals:
-    /// Emitted when scene was clicked and raycast hit an entity.
+    /// Emitted when mouse cursor moves on top of an entity.
     /** @param entity Hit entity.
         @param Possible mouse button held down during the move.
         @param result Raycast result data object. */
