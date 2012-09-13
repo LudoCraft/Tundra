@@ -1,6 +1,11 @@
 /** For conditions of distribution and use, see copyright notice in LICENSE
 
-    InfiniteWorld.js - A demo/testbed scene for profiling bottlenecks when dealing with a large world. */
+    InfiniteWorld.js - A demo/testbed scene for profiling bottlenecks when dealing with a large world.  */
+
+// !ref: SceneBlockOnlyTerrainFlat.txml
+// !ref: SceneBlockOnlyTerrain.txml
+// !ref: SceneBlockOneNpc.txml
+// !ref: SceneBlockMultipleNpcs.txml
 
 // TODOs:
 // 1) Get FireEaters working
@@ -147,14 +152,14 @@ function SceneBlockAt(pos)
 function InstantiateSceneBlock(pos, rowIdx, colIdx)
 {
     // Flat terrain
-//    var sceneBlockFile = "/Assets/SceneBlockOnlyTerrainFlat.txml";
+//    var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrainFlat.txml").DiskSource();
     // Terrain
-    var sceneBlockFile = "/Assets/SceneBlockOnlyTerrain.txml";
+    var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrain.txml").DiskSource();
     // Terrain + 1 FireEater:
-    //var sceneBlockFile = "/Assets/SceneBlockOneNpc.txml";
+    //var sceneBlockFile = asset.GetAsset("SceneBlockOneNpc.txml").DiskSource();
     // Terrain + 63 FireEaters:
-    //var sceneBlockFile = "/Assets/SceneBlockMultipleNpcs.txml";
-    var entities = scene.LoadSceneXML(application.currentWorkingDirectory + sceneBlockFile, false, false, 0);
+    //var sceneBlockFile = asset.GetAsset("SceneBlockMultipleNpcs.txml").DiskSource();
+    var entities = scene.LoadSceneXML(sceneBlockFile, false, false, 0);
     if (entities.length == 0)
     {
         LogE("InstantiateSceneBlock: Failed to instantiate " + sceneBlockFile);
