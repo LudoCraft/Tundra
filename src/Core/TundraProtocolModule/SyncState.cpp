@@ -10,21 +10,18 @@
 
 #include "LoggingFunctions.h"
 
-/// @remark Enables a 'pending' logic in SyncManager, with which a script can throttle the sending of entities to clients.
-typedef std::vector<entity_id_t> EntityIdList;
-typedef EntityIdList::const_iterator PendingConstIter;
-typedef EntityIdList::iterator PendingIter;
-
 SceneSyncState::SceneSyncState(int userConnectionID, bool isServer) :
     userConnectionID_(userConnectionID),
     changeRequest_(userConnectionID),
-    isServer_(isServer)
+    isServer_(isServer),
+    observerPos(float3::nan),
+    observerRot(float3::nan)
 {
-    Clear();
 }
 
 SceneSyncState::~SceneSyncState()
 {
+    Clear();
 }
 
 // Public slots
@@ -33,7 +30,7 @@ SceneSyncState::~SceneSyncState()
 QVariantList SceneSyncState::PendingEntityIDs() const
 {
     QVariantList list;
-    for(PendingConstIter iter = pendingEntities_.begin(); iter != pendingEntities_.end(); ++iter)
+    for(std::vector<entity_id_t>::const_iterator iter = pendingEntities_.begin(); iter != pendingEntities_.end(); ++iter)
     {
         entity_id_t id = (*iter);
         if (!list.contains(id))
@@ -47,7 +44,7 @@ entity_id_t SceneSyncState::NextPendingEntityID() const
 {
     if (pendingEntities_.empty())
         return 0;
-    PendingConstIter front = pendingEntities_.begin();
+    std::vector<entity_id_t>::const_iterator front = pendingEntities_.begin();
     if (front == pendingEntities_.end())
         return 0;
     return (*front);
@@ -62,7 +59,7 @@ bool SceneSyncState::HasPendingEntities() const
 /// @remark Enables a 'pending' logic in SyncManager, with which a script can throttle the sending of entities to clients.
 bool SceneSyncState::HasPendingEntity(entity_id_t id) const
 {
-    for(PendingConstIter iter = pendingEntities_.begin(); iter != pendingEntities_.end(); ++iter)
+    for(std::vector<entity_id_t>::const_iterator iter = pendingEntities_.begin(); iter != pendingEntities_.end(); ++iter)
     {
         if ((*iter) == id)
             return true;
@@ -94,7 +91,7 @@ void SceneSyncState::MarkPendingEntitiesDirty()
 
     // Get current entity ids to a separate list as MarkPendingEntityDirty modified pendingEntities_.
     QList<entity_id_t> entIds;
-    for(PendingConstIter iter = pendingEntities_.begin(); iter != pendingEntities_.end(); ++iter)
+    for(std::vector<entity_id_t>::const_iterator iter = pendingEntities_.begin(); iter != pendingEntities_.end(); ++iter)
     {
         entity_id_t id = (*iter);
         if (!entIds.contains(id))
@@ -309,7 +306,7 @@ bool SceneSyncState::ShouldMarkAsDirty(entity_id_t id)
 void SceneSyncState::RemovePendingEntity(entity_id_t id)
 {
     // This assumes that the id has not been added multiple times to our vector.
-    for(PendingIter iter = pendingEntities_.begin(); iter != pendingEntities_.end(); ++iter)
+    for(std::vector<entity_id_t>::iterator iter = pendingEntities_.begin(); iter != pendingEntities_.end(); ++iter)
     {
         if ((*iter) == id)
         {

@@ -4,9 +4,6 @@
 
 #include "CoreTypes.h"
 #include "SceneFwd.h"
-
-#include "kNet/PolledTimer.h"
-#include "kNet/Types.h"
 #include "Transform.h"
 #include "Math/float3.h"
 
@@ -17,7 +14,12 @@
 #include <map>
 #include <set>
 
+#include <kNet/PolledTimer.h>
+#include <kNet/Types.h>
+#include <kNet/MaxHeap.h>
+
 /// Component's per-user network sync state
+/* @sa EntitySyncState, SceneSyncState */
 struct ComponentSyncState
 {
     ComponentSyncState() :
@@ -62,6 +64,7 @@ struct ComponentSyncState
 };
 
 /// Entity's per-user network sync state
+/* @sa ComponentSyncState, SceneSyncState */
 struct EntitySyncState
 {
     EntitySyncState() :
@@ -69,7 +72,9 @@ struct EntitySyncState
         isNew(true),
         isInQueue(false),
         id(0),
-        avgUpdateInterval(0.0f)
+        avgUpdateInterval(0.0f),
+        priority(-1.f),
+        relevancy(-1.f)
     {
     }
     
@@ -138,6 +143,8 @@ struct EntitySyncState
         isNew = false;
     }
     
+    /// @todo Rename to ComputeUpdateInterval or similar and take priority and relevancy into account?
+    /// Or should a new function be added for that purpose?
     void UpdateReceived()
     {
         float time = updateTimer.MSecsElapsed() * 0.001f;
@@ -158,7 +165,7 @@ struct EntitySyncState
     bool removed; ///< The entity has been removed since last update
     bool isNew; ///< The client does not have the entity and it must be serialized in full
     bool isInQueue; ///< The entity is already in the scene's dirty queue
-    
+
     kNet::PolledTimer updateTimer; ///< Last update received timer
     float avgUpdateInterval; ///< Average network update interval in seconds
 
@@ -168,6 +175,16 @@ struct EntitySyncState
     float3 linearVelocity;
     float3 angularVelocity;
     kNet::tick_t lastNetworkSendTime;
+
+    /// Priority = size / distance for visible entities, inf for non-visible.
+    /** Larger number means larger importancy. If this value has not been yet calculated it's < 0.
+        Used to determinate the update interval of the entity together with relevancy. */
+    float priority;
+    /// Arbitrary relevancy factor.
+    /** Larger number means larger importancy. If this has not been yet calculated it's < 0.
+        F.ex. direction or visibility or of the entity can affect this.
+        Used to determinate the update interval of the entity together with priority. */
+    float relevancy;
 };
 
 struct RigidBodyInterpolationState
@@ -199,18 +216,16 @@ struct RigidBodyInterpolationState
 class StateChangeRequest : public QObject
 {
     Q_OBJECT
-
     Q_PROPERTY(bool accepted READ Accepted WRITE SetAccepted)
     Q_PROPERTY(int connectionID READ ConnectionID)
-
     Q_PROPERTY(entity_id_t entityId READ EntityId)
     Q_PROPERTY(Entity* entity READ GetEntity)
 
 public:
     StateChangeRequest(int connectionID) :
         connectionID_(connectionID)
-    { 
-        Reset(); 
+    {
+        Reset();
     }
 
     void Reset(entity_id_t entityId = 0)
@@ -222,44 +237,31 @@ public:
 
 public slots:
     /// Set the change request accepted
-    void SetAccepted(bool accepted)         
-    { 
-        accepted_ = accepted; 
-    }
+    void SetAccepted(bool accepted) { accepted_ = accepted; }
 
     /// Accept the whole change request.
-    void Accept()
-    {
-        accepted_ = true;
-    }
+    void Accept() { accepted_ = true; }
 
     /// Reject the whole change request.
-    void Reject()
-    {
-        accepted_ = false;
-    }
+    void Reject() { accepted_ = false; }
 
 public:
-    bool Accepted()                         { return accepted_; }
-    bool Rejected()                         { return !accepted_; }
-
-    int ConnectionID()                      { return connectionID_; }
-
-    entity_id_t EntityId()                  { return entityId_; }
-    Entity* GetEntity()                     { return entity_; }
-    void SetEntity(Entity* entity)          { entity_ = entity; }
+    bool Accepted() const { return accepted_; }
+    bool Rejected() const { return !accepted_; }
+    int ConnectionID()const { return connectionID_; }
+    entity_id_t EntityId() const { return entityId_; }
+    Entity* GetEntity() const { return entity_; }
+    void SetEntity(Entity* entity) { entity_ = entity; }
 
 private:
     bool accepted_;
     int connectionID_;
-
     entity_id_t entityId_;
     Entity* entity_;
 };
 
-typedef std::list<component_id_t> ComponentIdList;
-
 /// Scene's per-user network sync state
+/* @sa ComponentSyncState, EntitySyncState */
 class SceneSyncState : public QObject
 {
     Q_OBJECT
@@ -269,21 +271,29 @@ public:
     virtual ~SceneSyncState();
 
     /// Dirty entities pending processing
-    std::list<EntitySyncState*> dirtyQueue; 
+    std::list<EntitySyncState*> dirtyQueue;
 
     /// Entity sync states
-    std::map<entity_id_t, EntitySyncState> entities; 
+    std::map<entity_id_t, EntitySyncState> entities;
 
     /// Entity interpolations
     std::map<entity_id_t, RigidBodyInterpolationState> entityInterpolations;
 
+    /// Last sent (client) or received (server) observer position.
+    /** If !IsFinite() ObserverPosition message has not been been received from the client. */
+    float3 observerPos;
+    /// Last sent (client) or received (server) observer orientation.
+    /** If !IsFinite() ObserverPosition message has not been been received from the client. */
+    float3 observerRot;
+
 signals:
-    /// This signal is emitted when a entity is being added to the client sync state.
+    /// This signal is emitted when an entity is being added to the client sync state.
     /// All needed data for evaluation logic is in the StateChangeRequest parameter object.
     /// If 'request.Accepted()' is true (default) the entity will be added to the sync state,
     /// otherwise it will be added to the pending entities list. 
-    /// @note See also HasPendingEntity and MarkPendingEntityDirty.
+    /// @sa HasPendingEntity and MarkPendingEntityDirty.
     /// @param request StateChangeRequest object.
+    /// @remark Enables a 'pending' logic in SyncManager, with which a script can throttle the sending of entities to clients.
     void AboutToDirtyEntity(StateChangeRequest *request);
 
 public slots:

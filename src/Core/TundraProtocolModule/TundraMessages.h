@@ -9,6 +9,7 @@ const unsigned long cClientJoinedMessage = 102;
 const unsigned long cClientLeftMessage = 103;
 
 // Scenesync
+const unsigned long cObserverPositionMessage = 109; // Client->server only
 const unsigned long cCreateEntityMessage = 110;
 const unsigned long cCreateComponentsMessage = 111;
 const unsigned long cCreateAttributesMessage = 112;

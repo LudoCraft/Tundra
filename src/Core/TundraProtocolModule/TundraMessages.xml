@@ -23,7 +23,7 @@
         <u8 name="userID" />
     </message>
 
-    <!-- SCENE REPLICATION, messages 110 - 119, use immediate mode serialization and are defined in code -->
+    <!-- SCENE REPLICATION, messages 109 - 119, use immediate mode serialization and are defined in code -->
 
     <!-- ENTITY ACTIONS -->
 

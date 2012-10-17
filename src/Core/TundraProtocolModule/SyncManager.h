@@ -23,19 +23,23 @@ namespace TundraLogic
 class SyncManager : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(bool interestManagementEnabled READ IsInterestManagementEnabled WRITE SetInterestManagementEnabled) /**< @copydoc interestManagementEnabled */
 
 public:
     explicit SyncManager(TundraLogicModule* owner);
     ~SyncManager();
-    
+
     /// Register to entity/component change signals from a specific scene and start syncing them
-    void RegisterToScene(ScenePtr scene);
-    
+    void RegisterToScene(const ScenePtr &scene);
+
     /// Accumulate time & send pending sync messages if enough time passed from last update
     void Update(f64 frametime);
-    
+
     /// Create new replication state for user and dirty it (server operation only)
     void NewUserConnected(const UserConnectionPtr &user);
+
+    void SetInterestManagementEnabled(bool enable) { interestManagementEnabled = enable; }
+    bool IsInterestManagementEnabled() const { return interestManagementEnabled; }
 
 public slots:
     /// Set update period (seconds)
@@ -46,7 +50,8 @@ public slots:
 
     /// Returns SceneSyncState for a client connection.
     /** @note This slot is only exposed on Server, other wise will return null ptr.
-        @param int connection ID of the client. */
+        @param int connection ID of the client.
+        @todo This functions is an "overload" (same functionality but different name) as GetSceneSyncState */
     SceneSyncState* SceneState(int connectionId) const;
     SceneSyncState* SceneState(const UserConnectionPtr &connection) const; /**< @overload @param connection Client connection.*/
 
@@ -91,7 +96,7 @@ private:
     void QueueMessage(kNet::MessageConnection* connection, kNet::message_id_t id, bool reliable, bool inOrder, kNet::DataSerializer& ds);
     
     /// Craft a component full update, with all static and dynamic attributes.
-    void WriteComponentFullUpdate(kNet::DataSerializer& ds, ComponentPtr comp);
+    void WriteComponentFullUpdate(kNet::DataSerializer& ds, const ComponentPtr &comp);
     
     /// Handle entity action message.
     void HandleEntityAction(kNet::MessageConnection* source, MsgEntityAction& msg);
@@ -120,6 +125,8 @@ private:
 
     void InterpolateRigidBodies(f64 frametime, SceneSyncState* state);
 
+    void HandleObserverPosition(kNet::MessageConnection* source, const char* data, size_t numBytes);
+
     /// Read client extrapolation time parameter from command line and match it to the current sync period.
     void GetClientExtrapolationTime();
 
@@ -136,10 +143,15 @@ private:
     bool ValidateAction(kNet::MessageConnection* source, unsigned messageID, entity_id_t entityID);
     
     /// Get a syncstate that matches the messageconnection, for reflecting arrived changes back
-    /** For client, this will always be server_syncstate_. */
+    /** For client, this will always be serverSyncState. */
     SceneSyncState* GetSceneSyncState(kNet::MessageConnection* connection);
 
     ScenePtr GetRegisteredScene() const { return scene_.lock(); }
+
+    /// (Re)computes priority for entity.
+    void ComputePriorityForEntitySyncState(SceneSyncState *sceneState, EntitySyncState *entityState, Entity *entity);
+    /// (Re)computes priorities for all entities in the scene.
+    void ComputePrioritiesForEntitySyncStates(SceneSyncState *sceneState);
 
     /// Owning module
     TundraLogicModule* owner_;
@@ -161,7 +173,7 @@ private:
     bool noClientPhysicsHandoff_;
     
     /// Server sync state (client only)
-    SceneSyncState server_syncstate_;
+    SceneSyncState serverSyncState;
     
     /// Fixed buffers for crafting messages
     char createEntityBuffer_[64 * 1024];
@@ -173,6 +185,8 @@ private:
     char removeEntityBuffer_[1024];
     char removeAttrsBuffer_[1024];
     std::vector<u8> changedAttributes_;
+
+    bool interestManagementEnabled; ///< Is the interest management enabled.
 };
 
 }
