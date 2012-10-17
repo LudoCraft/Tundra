@@ -66,6 +66,9 @@ public slots:
     /// Forcibly kills this connection without notifying the peer.
     void Close();
 
+    /// Returns the sync state of the scene.
+    SceneSyncState *SyncState() const { return syncState.get(); }
+
     int GetConnectionID() const { return ConnectionId(); }  /**< @deprecated Use ConnectionId or 'id' @todo Add warning print */
     QString GetLoginData() const { return LoginData(); }  /**< @deprecated Use LoginData @todo Add warning print */
     QString GetProperty(const QString& key) const { return Property(key); } /**< @deprecated Use Property @todo Add warning print */

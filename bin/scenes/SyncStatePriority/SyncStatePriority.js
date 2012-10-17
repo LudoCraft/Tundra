@@ -54,10 +54,10 @@ function OnFrameUpdate(frametime)
 
     profiler.BeginBlock("SyncPriority_Update");
 
-    for (var i=0; i<users.length; ++i)
+    for (for i in users)
     {
         var connId = users[i].id;
-        var sceneState = syncmanager.SceneState(connId);
+        var sceneState = users[i].SceneState();
         var clientState = data.clientStates[connId.toString()];
 
         if (sceneState == null)

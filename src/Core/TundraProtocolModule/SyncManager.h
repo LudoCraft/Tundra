@@ -24,6 +24,7 @@ class SyncManager : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(bool interestManagementEnabled READ IsInterestManagementEnabled WRITE SetInterestManagementEnabled) /**< @copydoc interestManagementEnabled */
+    Q_PROPERTY(float updatePeriod READ UpdatePeriod WRITE SetUpdatePeriod) /**< @copydoc updatePeriod_ */
 
 public:
     explicit SyncManager(TundraLogicModule* owner);
@@ -41,19 +42,18 @@ public:
     void SetInterestManagementEnabled(bool enable) { interestManagementEnabled = enable; }
     bool IsInterestManagementEnabled() const { return interestManagementEnabled; }
 
+    /// Returns the update period
+    float UpdatePeriod() const { return updatePeriod_; }
+
 public slots:
-    /// Set update period (seconds)
+    /// Sets the update period (seconds)
+    /** @todo Doesn't need to be a slot, exposed as property. */
     void SetUpdatePeriod(float period);
 
-    /// Get update period
-    float GetUpdatePeriod() const { return updatePeriod_; }
-
-    /// Returns SceneSyncState for a client connection.
-    /** @note This slot is only exposed on Server, other wise will return null ptr.
-        @param int connection ID of the client.
-        @todo This functions is an "overload" (same functionality but different name) as GetSceneSyncState */
-    SceneSyncState* SceneState(int connectionId) const;
-    SceneSyncState* SceneState(const UserConnectionPtr &connection) const; /**< @overload @param connection Client connection.*/
+    // DEPRECATED
+    float GetUpdatePeriod() const { return UpdatePeriod(); } /**< @deprecated Use UpdatePeriod @ todo Remove */
+    SceneSyncState* SceneState(int connectionId); /**< @deprecated Use UserConnection::SyncState @note Duplicate of of GetSceneSyncState @todo Add deprecated warning print and remove. */
+    SceneSyncState* SceneState(const UserConnectionPtr &connection); /**< @deprecated Use UserConnection::SyncState @todo Add deprecated warning print and remove. */
 
 signals:
     /// This signal is emitted when a new user connects and a new SceneSyncState is created for the connection.
@@ -162,7 +162,7 @@ private:
     /// Scene pointer
     SceneWeakPtr scene_;
     
-    /// Time period for update, default 1/30th of a second
+    /// Time period for update (seconds), default 1/20th of a second
     float updatePeriod_;
     /// Time accumulator for update
     float updateAcc_;
