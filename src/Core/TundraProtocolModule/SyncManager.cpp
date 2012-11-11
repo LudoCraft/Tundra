@@ -1099,7 +1099,7 @@ void SyncManager::HandleRigidBodyChanges(kNet::MessageConnection* source, kNet::
         if (posSendType != 0 || rotSendType != 0 || scaleSendType != 0 || velSendType != 0 || angVelSendType != 0)
         {
             // Create or update the interpolation state.
-            Transform orig = placeable->transform.Get();
+            const Transform &orig = placeable->transform.Get();
 
             std::map<entity_id_t, RigidBodyInterpolationState>::iterator iter = serverSyncState.entityInterpolations.find(entityID);
             if (iter != serverSyncState.entityInterpolations.end())
