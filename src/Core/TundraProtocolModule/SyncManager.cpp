@@ -1,6 +1,7 @@
 // For conditions of distribution and use, see copyright notice in LICENSE
 
 #include "StableHeaders.h"
+#define MATH_OGRE_INTEROP
 #include "DebugOperatorNew.h"
 
 #include "KristalliProtocolModule.h"
@@ -28,6 +29,7 @@
 #ifdef EC_Sound_ENABLED
 #include "EC_Sound.h"
 #endif
+#include "OgreMeshAsset.h"
 
 #include <kNet.h>
 
@@ -43,19 +45,21 @@ kNet::MessageConnection* currentSender = 0;
 /// Compares EntitySyncStates by priority and relevancy.
 bool EntitySyncStatePriorityLessThan(const EntitySyncState *lhs, const EntitySyncState *rhs)
 {
-    return lhs->priority + lhs->relevancy < rhs->priority + rhs->relevancy;
+    return lhs->priority * lhs->relevancy < rhs->priority * rhs->relevancy;
 }
 
 namespace TundraLogic
 {
 
-void SyncManager::QueueMessage(kNet::MessageConnection* connection, kNet::message_id_t id, bool reliable, bool inOrder, kNet::DataSerializer& ds)
+void SyncManager::QueueMessage(kNet::MessageConnection* connection, kNet::message_id_t id, bool reliable, bool inOrder, kNet::DataSerializer& ds, EntitySyncState *state)
 {
     kNet::NetworkMessage* msg = connection->StartNewMessage(id, ds.BytesFilled());
     memcpy(msg->data, ds.GetData(), ds.BytesFilled());
     msg->reliable = reliable;
     msg->inOrder = inOrder;
     msg->priority = 100; // Fixed priority as in those defined with xml
+    if (state)
+        state->lastNetworkSendTime = kNet::Clock::Tick();
     connection->EndAndQueueMessage(msg);
 }
 
@@ -105,7 +109,7 @@ SyncManager::SyncManager(TundraLogicModule* owner) :
     connect(kristalli, SIGNAL(NetworkMessageReceived(kNet::MessageConnection *, kNet::packet_id_t, kNet::message_id_t, const char *, size_t)), 
         this, SLOT(HandleKristalliMessage(kNet::MessageConnection*, kNet::packet_id_t, kNet::message_id_t, const char*, size_t)));
     
-    /// @todo Read "im" command line paremeter for enabling/disabling IM and for possible setting configuration.
+    /// @todo Read "interestManagement" command line paremeter for enabling/disabling IM and for possible setting configuration.
     if (framework_->HasCommandLineParameter("--noclientphysics"))
         noClientPhysicsHandoff_ = true;
     
@@ -114,6 +118,11 @@ SyncManager::SyncManager(TundraLogicModule* owner) :
 
 SyncManager::~SyncManager()
 {
+}
+
+void SyncManager::SetObserver(Entity *entity)
+{
+    observer = (entity ? entity->shared_from_this() : EntityPtr());
 }
 
 void SyncManager::SetUpdatePeriod(float period)
@@ -141,18 +150,16 @@ void SyncManager::GetClientExtrapolationTime()
     }
 }
 
-SceneSyncState* SyncManager::SceneState(int connectionId) const
+SceneSyncState* SyncManager::SceneState(int connectionId)
 {
+    LogWarning("SyncManager::SceneState is deprecated and will be deleted. Use UserConnection::SyncState instead.");
     return SceneState(owner_->GetServer()->GetUserConnection(connectionId));
 }
 
-SceneSyncState* SyncManager::SceneState(const UserConnectionPtr &connection) const
+SceneSyncState* SyncManager::SceneState(const UserConnectionPtr &connection)
 {
-    if (!connection)
-        return 0;
-    if (!owner_->IsServer())
-        &serverSyncState;
-    return connection->syncState.get();
+    LogWarning("SyncManager::SceneState is deprecated and will be deleted. Use UserConnection::SyncState instead.");
+    return (connection ? GetSceneSyncState(connection->connection) : 0);
 }
 
 void SyncManager::RegisterToScene(const ScenePtr &scene)
@@ -333,22 +340,21 @@ void SyncManager::OnAttributeAdded(IComponent* comp, IAttribute* attr, Attribute
     if (!comp || !attr)
         return;
 
-    bool isServer = owner_->IsServer();
-    
     // We do not allow to create attributes in local or disconnected signaling mode in a replicated component.
     // Always replicate the creation, because the client & server must have their attribute count in sync to 
     // be able to send attribute bitmasks
     if (comp->IsLocal())
         return;
     Entity* entity = comp->ParentEntity();
-    if ((!entity) || (entity->IsLocal()))
+    if (!entity || entity->IsLocal())
         return;
     
-    if (isServer)
+    if (owner_->IsServer())
     {
         UserConnectionList& users = owner_->GetKristalliModule()->GetUserConnections();
         for(UserConnectionList::iterator i = users.begin(); i != users.end(); ++i)
-            if ((*i)->syncState) (*i)->syncState->MarkAttributeCreated(entity->Id(), comp->Id(), attr->Index());
+            if ((*i)->syncState)
+                (*i)->syncState->MarkAttributeCreated(entity->Id(), comp->Id(), attr->Index());
     }
     else
     {
@@ -362,22 +368,21 @@ void SyncManager::OnAttributeRemoved(IComponent* comp, IAttribute* attr, Attribu
     if (!comp || !attr)
         return;
 
-    bool isServer = owner_->IsServer();
-    
     // We do not allow to remove attributes in local or disconnected signaling mode in a replicated component.
     // Always replicate the removeal, because the client & server must have their attribute count in sync to
     // be able to send attribute bitmasks
     if (comp->IsLocal())
         return;
     Entity* entity = comp->ParentEntity();
-    if ((!entity) || (entity->IsLocal()))
+    if (!entity || entity->IsLocal())
         return;
     
-    if (isServer)
+    if (owner_->IsServer())
     {
         UserConnectionList& users = owner_->GetKristalliModule()->GetUserConnections();
         for(UserConnectionList::iterator i = users.begin(); i != users.end(); ++i)
-            if ((*i)->syncState) (*i)->syncState->MarkAttributeRemoved(entity->Id(), comp->Id(), attr->Index());
+            if ((*i)->syncState)
+                (*i)->syncState->MarkAttributeRemoved(entity->Id(), comp->Id(), attr->Index());
     }
     else
     {
@@ -400,7 +405,8 @@ void SyncManager::OnComponentAdded(Entity* entity, IComponent* comp, AttributeCh
     {
         UserConnectionList& users = owner_->GetKristalliModule()->GetUserConnections();
         for(UserConnectionList::iterator i = users.begin(); i != users.end(); ++i)
-            if ((*i)->syncState) (*i)->syncState->MarkComponentDirty(entity->Id(), comp->Id());
+            if ((*i)->syncState)
+                (*i)->syncState->MarkComponentDirty(entity->Id(), comp->Id());
     }
     else
     {
@@ -422,7 +428,8 @@ void SyncManager::OnComponentRemoved(Entity* entity, IComponent* comp, Attribute
     {
         UserConnectionList& users = owner_->GetKristalliModule()->GetUserConnections();
         for(UserConnectionList::iterator i = users.begin(); i != users.end(); ++i)
-            if ((*i)->syncState) (*i)->syncState->MarkComponentRemoved(entity->Id(), comp->Id());
+            if ((*i)->syncState)
+                (*i)->syncState->MarkComponentRemoved(entity->Id(), comp->Id());
     }
     else
     {
@@ -474,7 +481,8 @@ void SyncManager::OnEntityRemoved(Entity* entity, AttributeChange::Type change)
     {
         UserConnectionList& users = owner_->GetKristalliModule()->GetUserConnections();
         for(UserConnectionList::iterator i = users.begin(); i != users.end(); ++i)
-            if ((*i)->syncState) (*i)->syncState->MarkEntityRemoved(entity->Id());
+            if ((*i)->syncState)
+                (*i)->syncState->MarkEntityRemoved(entity->Id());
     }
     else
     {
@@ -524,8 +532,7 @@ void SyncManager::OnUserActionTriggered(UserConnection* user, Entity *entity, co
     assert(user && entity);
     if (!entity || !user)
         return;
-    bool isServer = owner_->IsServer();
-    if (!isServer)
+    if (!owner_->IsServer())
         return; // Should never happen
     if (user->properties["authenticated"] != "true")
         return; // Not yet authenticated, do not receive actions
@@ -700,11 +707,8 @@ void SyncManager::Update(f64 frametime)
     if (!scene)
         return;
     
-    if (owner_->IsServer())
+    if (owner_->IsServer()) // Server, process all authenticated users
     {
-        // If we are server, process all authenticated users
-
-        // Then send out changes to other attributes via the generic sync mechanism.
         UserConnectionList& users = owner_->GetKristalliModule()->GetUserConnections();
         for(UserConnectionList::iterator i = users.begin(); i != users.end(); ++i)
             if ((*i)->syncState)
@@ -713,43 +717,19 @@ void SyncManager::Update(f64 frametime)
                 // After processing this function, the bits related to rigid body states have been cleared,
                 // so the generic sync will not double-replicate the rigid body positions and velocities.
                 ReplicateRigidBodyChanges((*i)->connection, (*i)->syncState.get());
-
+                // Then send out changes to other attributes via the generic sync mechanism.
                 ProcessSyncState((*i)->connection, (*i)->syncState.get());
             }
     }
-    else
+    else // Client, process just the server sync state
     {
-        // If we are client, process just the server sync state
         kNet::MessageConnection* connection = owner_->GetKristalliModule()->GetMessageConnection();
         if (connection)
+        {
             ProcessSyncState(connection, &serverSyncState);
 
-        if (interestManagementEnabled)
-        {
-            // Send client's observer information.
-            Entity *camera = framework_->Renderer()->MainCamera();
-            EC_Placeable *cameraPlaceable = camera ? camera->GetComponent<EC_Placeable>().get() : 0;
-            if (cameraPlaceable)
-            {
-                float3 pos = cameraPlaceable->WorldPosition();
-                float3 rot = cameraPlaceable->WorldOrientation().ToEulerZYX();
-                if (!pos.Equals(serverSyncState.observerPos) || !rot.Equals(serverSyncState.observerRot))
-                {
-                    serverSyncState.observerPos = pos;
-                    serverSyncState.observerRot = rot;
-                    const size_t dataSize = sizeof(float) * 6 + sizeof(uint); /** <@todo use scene_id_t instead of uint when available */
-                    char dataBuffer[dataSize];
-                    kNet::DataSerializer ds(dataBuffer, dataSize);
-                    ds.AddVLE<kNet::VLE8_16_32>((uint)0/*scene->Id()*/);/** <@todo Use proper scene ID when available */
-                    ds.Add<float>(pos.x);
-                    ds.Add<float>(pos.y);
-                    ds.Add<float>(pos.z);
-                    ds.Add<float>(rot.x);
-                    ds.Add<float>(rot.y);
-                    ds.Add<float>(rot.z);
-                    QueueMessage(connection, cObserverPositionMessage, false, false, ds);
-                }
-            }
+            if (interestManagementEnabled) // Send client's observer information if IM enabled.
+                SendObserverPosition(connection, &serverSyncState);
         }
     }
 }
@@ -1068,7 +1048,7 @@ void SyncManager::HandleRigidBodyChanges(kNet::MessageConnection* source, kNet::
         else if (rotSendType == 3)
         {
             // Read the quantized float manually, without a call to ReadQuantizedFloat, to be able to compare the quantized bit pattern.
-	        u32 quantizedAngle = dd.ReadBits(10);
+            u32 quantizedAngle = dd.ReadBits(10);
             if (quantizedAngle != 0)
             {
                 float angle = quantizedAngle * 3.141592654f / (float)((1 << 10) - 1);
@@ -1190,19 +1170,27 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
     unsigned sceneId = 0; ///\todo Replace with proper scene ID once multiscene support is in place.
     
     ScenePtr scene = scene_.lock();
-    int numMessagesSent = 0;
+    int numMessagesSent = 0;/**< @todo debug variable, remove */
 
     // Process the state's dirty entity queue.
-    if (interestManagementEnabled)
+    if (interestManagementEnabled) // If IM enabled, sort according to priority
         state->dirtyQueue.sort(EntitySyncStatePriorityLessThan);
-    /// \todo Limit and prioritize the data sent. For now the whole queue is processed, regardless of whether the connection is being saturated.
-    while(!state->dirtyQueue.empty())
+    std::list<EntitySyncState*>::iterator it = state->dirtyQueue.begin();
+    while(it != state->dirtyQueue.end())
     {
-        EntitySyncState& entityState = *state->dirtyQueue.front();
-        state->dirtyQueue.pop_front();
+        EntitySyncState& entityState = **it;
+        // If IM enabled, see if we need to sync yet.
+        float timeSinceLastSend = kNet::Clock::SecondsSinceF(entityState.lastNetworkSendTime);
+        if (interestManagementEnabled && timeSinceLastSend < entityState.PrioritizedUpdateInterval())
+        {
+            //UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(destination);
+            //LogDebug(QString("Skipping sending %1 to user %2 updateInterval %3").arg(entityState.id).arg((user ? user->ConnectionId() : 666)).arg(entityState.PrioritizedUpdateInterval()));
+            ++it;
+            continue;
+        }
+
         entityState.isInQueue = false;
-        
-        EntityPtr entity = scene->GetEntity(entityState.id);
+        EntityPtr entity = scene->EntityById(entityState.id);
         bool removeState = false;
         if (!entity)
         {
@@ -1215,11 +1203,13 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
         {
             // Make sure we don't send data for local entities, or unacked entities after the create
             if (entity->IsLocal() || (!entityState.isNew && entity->IsUnacked()))
+            {
+                it = state->dirtyQueue.erase(it);
                 continue;
+            }
         }
         
-        // Remove entity
-        if (entityState.removed)
+        if (entityState.removed) // Remove entity
         {
             // If we have both new & removed flags on the entity, it will probably result in buggy behaviour
             if (entityState.isNew)
@@ -1239,9 +1229,9 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
             ds.AddVLE<kNet::VLE8_16_32>(entityState.id & UniqueIdGenerator::LAST_REPLICATED_ID);
             QueueMessage(destination, cRemoveEntityMessage, true, true, ds);
             ++numMessagesSent;
+            it = state->dirtyQueue.erase(it);
         }
-        // New entity
-        else if (entityState.isNew)
+        else if (entityState.isNew) // New entity
         {
             kNet::DataSerializer ds(createEntityBuffer_, 64 * 1024);
             
@@ -1271,14 +1261,14 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
                 // Mark the component undirty in the receiver's syncstate
                 state->MarkComponentProcessed(entity->Id(), comp->Id());
             }
-            
-            QueueMessage(destination, cCreateEntityMessage, true, true, ds);
+
+            QueueMessage(destination, cCreateEntityMessage, true, true, ds, &entityState);
             ++numMessagesSent;
-            
+            it = state->dirtyQueue.erase(it);
             // The create has been processed fully. Clear dirty flags.
             state->MarkEntityProcessed(entity->Id());
         }
-        else if (entity)
+        else if (entity) // Existing entity
         {
             // Components or attributes have been added, changed, or removed. Prepare the dataserializers
             kNet::DataSerializer removeCompsDs(removeCompsBuffer_, 1024);
@@ -1309,8 +1299,7 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
                         continue;
                 }
                 
-                // Remove component
-                if (compState.removed)
+                if (compState.removed) // Remove component
                 {
                     removeCompState = true;
                     
@@ -1323,8 +1312,7 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
                     // Then add component ID
                     removeCompsDs.AddVLE<kNet::VLE8_16_32>(compState.id & UniqueIdGenerator::LAST_REPLICATED_ID);
                 }
-                // New component
-                else if (compState.isNew)
+                else if (compState.isNew) // New component
                 {
                     // If first component, write the entity ID first
                     if (!createCompsDs.BytesFilled())
@@ -1337,11 +1325,9 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
                     // Mark the component undirty in the receiver's syncstate
                     state->MarkComponentProcessed(entity->Id(), comp->Id());
                 }
-                // Added/removed/edited attributes
-                else if (comp)
+                else if (comp) // Added/removed/edited attributes
                 {
                     const AttributeVector& attrs = comp->Attributes();
-                    
                     for (std::map<u8, bool>::iterator i = compState.newAndRemovedAttributes.begin(); i != compState.newAndRemovedAttributes.end(); ++i)
                     {
                         u8 attrIndex = i->first;
@@ -1372,9 +1358,8 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
                                 attr->ToBinary(createAttrsDs);
                             }
                         }
-                        else
+                        else // Remove attribute
                         {
-                            // Remove attribute
                             // If first attribute, write the entity ID first
                             if (!removeAttrsDs.BytesFilled())
                             {
@@ -1424,8 +1409,7 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
                         // There are changed attributes. Check if it is more optimal to send attribute indices, or the whole bitmask
                         unsigned bitsMethod1 = changedAttributes_.size() * 8 + 8;
                         unsigned bitsMethod2 = attrs.size();
-                        // Method 1: indices
-                        if (bitsMethod1 <= bitsMethod2)
+                        if (bitsMethod1 <= bitsMethod2) // Method 1: indices
                         {
                             attrDataDs.Add<kNet::bit>(0);
                             attrDataDs.Add<u8>(changedAttributes_.size());
@@ -1435,8 +1419,7 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
                                 attrs[changedAttributes_[i]]->ToBinary(attrDataDs);
                             }
                         }
-                        // Method 2: bitmask
-                        else
+                        else // Method 2: bitmask
                         {
                             attrDataDs.Add<kNet::bit>(1);
                             for (unsigned i = 0; i < attrs.size(); ++i)
@@ -1468,30 +1451,31 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
             // Send the messages which have data
             if (removeCompsDs.BytesFilled())
             {
-                QueueMessage(destination, cRemoveComponentsMessage, true, true, removeCompsDs);
+                QueueMessage(destination, cRemoveComponentsMessage, true, true, removeCompsDs, &entityState);
                 ++numMessagesSent;
             }
             if (removeAttrsDs.BytesFilled())
             {
-                QueueMessage(destination, cRemoveAttributesMessage, true, true, removeAttrsDs);
+                QueueMessage(destination, cRemoveAttributesMessage, true, true, removeAttrsDs, &entityState);
                 ++numMessagesSent;
             }
             if (createCompsDs.BytesFilled())
             {
-                QueueMessage(destination, cCreateComponentsMessage, true, true, createCompsDs);
+                QueueMessage(destination, cCreateComponentsMessage, true, true, createCompsDs, &entityState);
                 ++numMessagesSent;
             }
             if (createAttrsDs.BytesFilled())
             {
-                QueueMessage(destination, cCreateAttributesMessage, true, true, createAttrsDs);
+                QueueMessage(destination, cCreateAttributesMessage, true, true, createAttrsDs, &entityState);
                 ++numMessagesSent;
             }
             if (editAttrsDs.BytesFilled())
             {
-                QueueMessage(destination, cEditAttributesMessage, true, true, editAttrsDs);
+                QueueMessage(destination, cEditAttributesMessage, true, true, editAttrsDs, &entityState);
                 ++numMessagesSent;
             }
-            
+
+            it = state->dirtyQueue.erase(it);
             // The entity has been processed fully. Clear dirty flags.
             state->MarkEntityProcessed(entity->Id());
         }
@@ -2011,9 +1995,8 @@ void SyncManager::HandleRemoveAttributes(kNet::MessageConnection* source, const 
         return;
     }
     
-    bool isServer = owner_->IsServer();
     // For clients, the change type is LocalOnly. For server, the change type is Replicate, so that it will get replicated to all clients in turn
-    AttributeChange::Type change = isServer ? AttributeChange::Replicate : AttributeChange::LocalOnly;
+    AttributeChange::Type change = owner_->IsServer() ? AttributeChange::Replicate : AttributeChange::LocalOnly;
     
     kNet::DataDeserializer ds(data, numBytes);
     unsigned sceneID = ds.ReadVLE<kNet::VLE8_16_32>(); ///\todo Dummy ID. Lookup scene once multiscene is properly supported
@@ -2118,9 +2101,8 @@ void SyncManager::HandleEditAttributes(kNet::MessageConnection* source, const ch
         const AttributeVector& attributes = comp->Attributes();
 
         int indexingMethod = attrDs.Read<kNet::bit>();
-        if (!indexingMethod)
+        if (!indexingMethod) // Method 1: indices
         {
-            // Method 1: indices
             u8 numChangedAttrs = attrDs.Read<u8>();
             for (unsigned i = 0; i < numChangedAttrs; ++i)
             {
@@ -2151,9 +2133,8 @@ void SyncManager::HandleEditAttributes(kNet::MessageConnection* source, const ch
                 }
             }
         }
-        else
+        else // Method 2: bitmask
         {
-            // Method 2: bitmask
             for (unsigned i = 0; i < attributes.size(); ++i)
             {
                 int changed = attrDs.Read<kNet::bit>();
@@ -2221,9 +2202,7 @@ void SyncManager::HandleCreateEntityReply(kNet::MessageConnection* source, const
     state->entities[entityID] = state->entities[senderEntityID]; // Copy the sync state to the new ID
     state->entities[entityID].id = entityID; // Must remember to change ID manually
     state->entities.erase(senderEntityID);
-    
-    //std::cout << "CreateEntityReply, entity " << senderEntityID << " -> " << entityID << std::endl;
-    
+
     EntitySyncState& entityState = state->entities[entityID];
     
     EntityPtr entity = scene->GetEntity(entityID);
@@ -2238,9 +2217,6 @@ void SyncManager::HandleCreateEntityReply(kNet::MessageConnection* source, const
     {
         component_id_t senderCompID = ds.ReadVLE<kNet::VLE8_16_32>() | UniqueIdGenerator::FIRST_UNACKED_ID;
         component_id_t compID = ds.ReadVLE<kNet::VLE8_16_32>();
-        
-        //std::cout << "CreateEntityReply, component " << senderCompID << " -> " << compID << std::endl;
-        
         entity->ChangeComponentId(senderCompID, compID);
         entityState.components[compID] = entityState.components[senderCompID]; // Copy the sync state to the new ID
         entityState.components[compID].id = compID; // Must remember to change ID manually
@@ -2253,12 +2229,9 @@ void SyncManager::HandleCreateEntityReply(kNet::MessageConnection* source, const
     
     // Send notification
     scene->EmitEntityAcked(entity.get(), senderEntityID);
-    
-    for (std::map<component_id_t, ComponentSyncState>::iterator i = entityState.components.begin(); i != entityState.components.end(); ++i)
-    {
-        // Now mark every component dirty so they will be inspected for changes on the next update
+    // Now mark every component dirty so they will be inspected for changes on the next update
+    for(std::map<component_id_t, ComponentSyncState>::iterator i = entityState.components.begin(); i != entityState.components.end(); ++i)
         state->MarkComponentDirty(entityID, i->first);
-    }
 }
 
 void SyncManager::HandleCreateComponentsReply(kNet::MessageConnection* source, const char* data, size_t numBytes)
@@ -2320,8 +2293,6 @@ void SyncManager::HandleCreateComponentsReply(kNet::MessageConnection* source, c
 
 void SyncManager::HandleEntityAction(kNet::MessageConnection* source, MsgEntityAction& msg)
 {
-    bool isServer = owner_->IsServer();
-    
     ScenePtr scene = GetRegisteredScene();
     if (!scene)
     {
@@ -2337,16 +2308,10 @@ void SyncManager::HandleEntityAction(kNet::MessageConnection* source, MsgEntityA
         return;
     }
 
-    // If we are server, get the user who sent the action, so it can be queried
-    if (isServer)
-    {
-        Server* server = owner_->GetServer().get();
-        if (server)
-        {
-            UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(source);
-            server->SetActionSender(user);
-        }
-    }
+    bool isServer = owner_->IsServer();
+    Server *server = owner_->GetServer().get();
+    if (isServer) // Set the user who sent the action, so it can be queried
+        server->SetActionSender(owner_->GetKristalliModule()->GetUserConnection(source));
     
     QString action = BufferToString(msg.name).c_str();
     QStringList params;
@@ -2376,10 +2341,7 @@ void SyncManager::HandleEntityAction(kNet::MessageConnection* source, MsgEntityA
     if (!handled)
         LogWarning("SyncManager: Received MsgEntityAction message \"" + action + "\", but it went unhandled because of its type=" + QString::number(type));
 
-    // Clear the action sender after action handling
-    Server *server = owner_->GetServer().get();
-    if (server)
-        server->SetActionSender(UserConnectionPtr());
+    server->SetActionSender(UserConnectionPtr()); // Clear the action sender after action handling
 }
 
 SceneSyncState* SyncManager::GetSceneSyncState(kNet::MessageConnection* connection)
@@ -2390,7 +2352,34 @@ SceneSyncState* SyncManager::GetSceneSyncState(kNet::MessageConnection* connecti
     return (user ? user->syncState.get() : 0);
 }
 
-void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, EntitySyncState *entityState, Entity *entity)
+void SyncManager::SendObserverPosition(kNet::MessageConnection *connection, SceneSyncState *senderState)
+{
+    EC_Placeable *placeable = !observer.expired() ? observer.lock()->GetComponent<EC_Placeable>().get() : 0;
+    if (placeable)
+    {
+        float3 pos = placeable->WorldPosition();
+        float3 rot = placeable->WorldOrientation().ToEulerZYX();
+        if (!pos.Equals(senderState->observerPos) || !rot.Equals(senderState->observerRot))
+        {
+            senderState->observerPos = pos;
+            senderState->observerRot = rot;
+            /// @todo Use optimized pos and rot format when applicable
+            const size_t dataSize = sizeof(uint) + 6 * sizeof(float); /** <@todo use scene_id_t instead of uint when available */
+            char dataBuffer[dataSize];
+            kNet::DataSerializer ds(dataBuffer, dataSize);
+            ds.AddVLE<kNet::VLE8_16_32>((uint)0/*scene->Id()*/);/** <@todo Use proper scene ID when available */
+            ds.Add<float>(pos.x);
+            ds.Add<float>(pos.y);
+            ds.Add<float>(pos.z);
+            ds.Add<float>(rot.x);
+            ds.Add<float>(rot.y);
+            ds.Add<float>(rot.z);
+            QueueMessage(connection, cObserverPositionMessage, false, false, ds);
+        }
+    }
+}
+
+void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, EntitySyncState *entityState, Entity *entity) const
 {
     assert(entityState || entity);
     if (!sceneState)
@@ -2399,11 +2388,19 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
         return; // camera information not received yet.
 
     if (!entityState && entity)
-        entityState = &sceneState->entities[entity->Id()]; /**< @todo Check that EntitySyncState really in sceneState->entities exists? */
+    {
+        if (sceneState->entities.find(entity->Id()) == sceneState->entities.end())
+        {
+            LogWarning("SyncManager::ComputePriorityForEntitySyncState: " + entity->ToString() + " does not exists in SceneSyncState.");
+            return;
+        }
+        entityState = &sceneState->entities[entity->Id()];
+    }
     if (entityState && !entity)
         entity = scene_.lock()->EntityById(entityState->id).get();
-    assert(entityState);
-    assert(entity);
+//    assert((entity && entityState));
+    if (!entityState || !entity)
+        return; // we might end up here e.g. when entity was deleted
 
     boost::shared_ptr<EC_Placeable> placeable = entity->GetComponent<EC_Placeable>();
     boost::shared_ptr<EC_Mesh> mesh = entity->GetComponent<EC_Mesh>();
@@ -2423,9 +2420,9 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
     /// @todo Handle terrains
 //    boost::shared_ptr<EC_Terrain> terrain = entity->GetComponent<EC_Terrain>();
 //    if (terrain)
-    /// @todo Handle rigid bodies
+    /// @todo Handle entities with rigid body but no placeable
 //    boost::shared_ptr<EC_RigidBody> rigidBody = entity->GetComponent<EC_RigidBody>();
-//    if (rigidBody)
+//    if (!placeable && rigidBody)
 
     if (!placeable)
     {
@@ -2435,27 +2432,41 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
     }
     else if (placeable && !mesh)
     {
-        // Spatial, but no mesh, for now use a harcoded priority of 10
-        entityState->priority = 10.f;
+        // Spatial, but no mesh, for now use a harcoded priority of 20 (updateInterval = 1 / (priority * relevance),
+        // so will probably yield the default SyncManager's update period 1/20th of a second
+        entityState->priority = 20.f;
         /// @todo retrieve/calculate bounding volumes of possible billboards, particle systems, lights, etc.
         /// Not going to be easy though, especially when running in headless mode.
     }
     else if (placeable && mesh)
     {
-        /// @todo EC_Mesh::WorldOBB not usable in headless mode, using hardcoded size of 100 in headless mode for now.
-        float sizeSq = (framework_->IsHeadless() ? 100.f : mesh->WorldOBB().SurfaceArea());
+        OBB worldObb;
+        /// @todo WorldOBB retrieval when in headless mode.
+        /*if (framework_->IsHeadless())
+        {
+            // EC_Mesh::WorldOBB not usable in headless mode so we must dig the OBB information from OgreMeshAsset instead.
+            Ogre::MeshPtr ogreMesh = mesh->MeshAsset() ? mesh->MeshAsset()->ogreMesh : Ogre::MeshPtr();
+            /// @todo what if ogreMesh.isNull?
+            worldObb = !ogreMesh.isNull() ? AABB(ogreMesh->getBounds()) : OBB();
+            LogDebug(worldObb.toString());
+            worldObb.Transform(placeable->LocalToWorld());
+        }
+        else*/
+            worldObb = mesh->WorldOBB();
+        float sizeSq = worldObb.SurfaceArea();
         sizeSq *= sizeSq;
         float distanceSq = sceneState->observerPos.DistanceSq(placeable->WorldPosition());
         entityState->priority = sizeSq/distanceSq;
 //        LogDebug(QString("%1 sizeSq %2 distanceSq %3").arg(entity->ToString()).arg(sizeSq).arg(distanceSq));
     }
-    /// @todo Relevancy 0 always for now.
-    entityState->relevancy = 0.f;
 
-    LogDebug(QString("Sync priority for %1: %2.").arg(entity->ToString()).arg(entityState->priority));
+    /// @todo Hardcoded relevancy 2 for entities with Avatar component and 1 for others for now.
+    entityState->relevancy = entity->GetComponent("EC_Avatar") ? 2.f : 1.f;
+//    if (entity->GetComponent("EC_Avatar"))//!EqualAbs(oldPrio, entityState->PrioritizedUpdateInterval()))
+//        LogDebug(QString("IM: %1 prio %2 rel %3 updateInterval %4").arg(entity->ToString()).arg(entityState->priority).arg(entityState->relevancy).arg(entityState->PrioritizedUpdateInterval()));
 }
 
-void SyncManager::ComputePrioritiesForEntitySyncStates(SceneSyncState *sceneState)
+void SyncManager::ComputePrioritiesForEntitySyncStates(SceneSyncState *sceneState) const
 {
     for(std::map<entity_id_t, EntitySyncState>::iterator it = sceneState->entities.begin(); it != sceneState->entities.end(); ++it)
         ComputePriorityForEntitySyncState(sceneState, &(*it).second, 0);

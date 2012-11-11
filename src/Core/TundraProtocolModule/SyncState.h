@@ -142,9 +142,8 @@ struct EntitySyncState
         dirtyQueue.clear();
         isNew = false;
     }
-    
-    /// @todo Rename to ComputeUpdateInterval or similar and take priority and relevancy into account?
-    /// Or should a new function be added for that purpose?
+
+    /// @todo Rename to something less ambiguous
     void UpdateReceived()
     {
         float time = updateTimer.MSecsElapsed() * 0.001f;
@@ -158,7 +157,14 @@ struct EntitySyncState
         else
             avgUpdateInterval = 0.5 * time + 0.5 * avgUpdateInterval;
     }
-    
+
+    /// Prioritized network update interval in seconds.
+    /* @remark Interest management */
+    float PrioritizedUpdateInterval() const { return Clamp(1.f / (priority * relevancy), maxUpdateRate, minUpdateRate); }
+
+    static const float minUpdateRate; ///< 5 (in seconds)
+    static const float maxUpdateRate; ///< 0.005 (in seconds)
+
     std::list<ComponentSyncState*> dirtyQueue; ///< Dirty components
     std::map<component_id_t, ComponentSyncState> components; ///< Component syncstates
     entity_id_t id; ///< Entity ID. Duplicated here intentionally to allow recognizing the entity without the parent map.
@@ -166,24 +172,27 @@ struct EntitySyncState
     bool isNew; ///< The client does not have the entity and it must be serialized in full
     bool isInQueue; ///< The entity is already in the scene's dirty queue
 
-    kNet::PolledTimer updateTimer; ///< Last update received timer
-    float avgUpdateInterval; ///< Average network update interval in seconds
+    kNet::PolledTimer updateTimer; ///< Last update received timer, for calculating avgUpdateInterval.
+    float avgUpdateInterval; ///< Average network update interval in seconds, used for interpolation.
 
     // Special cases for rigid body streaming:
     // On the server side, remember the last sent rigid body parameters, so that we can perform effective pruning of redundant data.
     Transform transform;
     float3 linearVelocity;
     float3 angularVelocity;
-    kNet::tick_t lastNetworkSendTime;
+    kNet::tick_t lastNetworkSendTime; ///< @note Shared usage by rigid body optimization and interest management.
 
     /// Priority = size / distance for visible entities, inf for non-visible.
     /** Larger number means larger importancy. If this value has not been yet calculated it's < 0.
-        Used to determinate the update interval of the entity together with relevancy. */
+        Used to determinate the prioritized update interval of the entity together with relevancy.
+        @remark Interest management */
     float priority;
+
     /// Arbitrary relevancy factor.
     /** Larger number means larger importancy. If this has not been yet calculated it's < 0.
         F.ex. direction or visibility or of the entity can affect this.
-        Used to determinate the update interval of the entity together with priority. */
+        Used to determinate the prioritized update interval of the entity together with priority.
+        @remark Interest management */
     float relevancy;
 };
 
@@ -344,20 +353,25 @@ public:
     void MarkAttributeCreated(entity_id_t id, component_id_t compId, u8 attrIndex);
     void MarkAttributeRemoved(entity_id_t id, component_id_t compId, u8 attrIndex);
 
-    // Silently does the same as MarkEntityDirty without emitting change request signal.
+    /// Silently does the same as MarkEntityDirty without emitting change request signal.
+    /// @remark Enables a 'pending' logic in SyncManager, with which a script can throttle the sending of entities to clients.
     EntitySyncState& MarkEntityDirtySilent(entity_id_t id);
 
-    // Removes entity from pending lists.
+    /// Removes entity from pending lists.
+    /// @remark Enables a 'pending' logic in SyncManager, with which a script can throttle the sending of entities to clients.
     void RemovePendingEntity(entity_id_t id);
 
 private:
-    // Returns if entity with id should be added to the sync state.
+    /// Returns if entity with id should be added to the sync state.
+    /// @remark Enables a 'pending' logic in SyncManager, with which a script can throttle the sending of entities to clients.
     bool ShouldMarkAsDirty(entity_id_t id);
 
-    // Fills changeRequest_ with entity data, returns if request is valid. 
+    /// Fills changeRequest_ with entity data, returns if request is valid. 
+    /// @remark Enables a 'pending' logic in SyncManager, with which a script can throttle the sending of entities to clients.
     bool FillRequest(entity_id_t id);
     
-    // Adds the entity id to the pending entity list.
+    /// Adds the entity id to the pending entity list.
+    /// @remark Enables a 'pending' logic in SyncManager, with which a script can throttle the sending of entities to clients.
     void AddPendingEntity(entity_id_t id);
 
     /// @remark Enables a 'pending' logic in SyncManager, with which a script can throttle the sending of entities to clients.

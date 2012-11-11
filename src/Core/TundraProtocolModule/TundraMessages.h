@@ -9,7 +9,7 @@ const unsigned long cClientJoinedMessage = 102;
 const unsigned long cClientLeftMessage = 103;
 
 // Scenesync
-const unsigned long cObserverPositionMessage = 109; // Client->server only
+const unsigned long cObserverPositionMessage = 109; // Client->server only currently, but could be used server->client also to tell that "you are now here".
 const unsigned long cCreateEntityMessage = 110;
 const unsigned long cCreateComponentsMessage = 111;
 const unsigned long cCreateAttributesMessage = 112;

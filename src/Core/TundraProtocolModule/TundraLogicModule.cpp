@@ -131,10 +131,7 @@ void TundraLogicModule::Initialize()
     // Expose client and server to everyone
     framework_->RegisterDynamicObject("client", client_.get());
     framework_->RegisterDynamicObject("server", server_.get());
-
-    // Expose SyncManager only on the server side for scripting
-    if (server_->IsAboutToStart())
-        framework_->RegisterDynamicObject("syncmanager", syncManager_.get());
+    framework_->RegisterDynamicObject("syncmanager", syncManager_.get());
 
     framework_->Console()->RegisterCommand("startserver", "Starts a server. Usage: startserver(port,protocol)",
         server_.get(), SLOT(Start(unsigned short,QString)));

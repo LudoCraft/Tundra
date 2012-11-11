@@ -10,6 +10,9 @@
 
 #include "LoggingFunctions.h"
 
+const float EntitySyncState::minUpdateRate = 5.f; //0.5f;
+const float EntitySyncState::maxUpdateRate = 0.005f;
+
 SceneSyncState::SceneSyncState(int userConnectionID, bool isServer) :
     userConnectionID_(userConnectionID),
     changeRequest_(userConnectionID),
