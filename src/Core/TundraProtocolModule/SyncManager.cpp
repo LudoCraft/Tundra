@@ -1166,22 +1166,25 @@ void SyncManager::HandleRigidBodyChanges(kNet::MessageConnection* source, kNet::
 void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSyncState* state)
 {
     PROFILE(SyncManager_ProcessSyncState);
-    
-    unsigned sceneId = 0; ///\todo Replace with proper scene ID once multiscene support is in place.
-    
+
+    unsigned sceneId = 0; /**< @todo Replace with proper scene ID once multiscene support is in place. */
     ScenePtr scene = scene_.lock();
     int numMessagesSent = 0;/**< @todo debug variable, remove */
 
-    // Process the state's dirty entity queue.
-    if (interestManagementEnabled) // If IM enabled, sort according to priority
+    // Interest management sync priorization performed only on the server
+    bool serverImEnabled = (owner_->IsServer() && interestManagementEnabled);
+
+    if (serverImEnabled) // Sort according to priority
         state->dirtyQueue.sort(EntitySyncStatePriorityLessThan);
+
+    // Process the state's dirty entity queue.
     std::list<EntitySyncState*>::iterator it = state->dirtyQueue.begin();
     while(it != state->dirtyQueue.end())
     {
         EntitySyncState& entityState = **it;
-        // If IM enabled, see if we need to sync yet.
+        // See if we need to sync yet.
         float timeSinceLastSend = kNet::Clock::SecondsSinceF(entityState.lastNetworkSendTime);
-        if (interestManagementEnabled && timeSinceLastSend < entityState.PrioritizedUpdateInterval())
+        if (serverImEnabled && timeSinceLastSend < entityState.PrioritizedUpdateInterval())
         {
             //UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(destination);
             //LogDebug(QString("Skipping sending %1 to user %2 updateInterval %3").arg(entityState.id).arg((user ? user->ConnectionId() : 666)).arg(entityState.PrioritizedUpdateInterval()));

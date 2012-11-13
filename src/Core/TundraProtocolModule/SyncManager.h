@@ -186,8 +186,14 @@ private:
     char removeAttrsBuffer_[1024];
     std::vector<u8> changedAttributes_;
 
-    bool interestManagementEnabled; ///< Is the interest management enabled. @remark Interest management
-    EntityWeakPtr observer; ///< If interestManagementEnabled true, the client's observer position information is sent to the server. @remark Interest management
+    /// Is interest management enabled.
+    /** On client this means that the observer's position information is sent to the server.
+        On server this means that dirty entities are sorted and synced according to their priority that is calculated according to observer position.
+        @remark Interest management */
+    bool interestManagementEnabled;
+    /// If interestManagementEnabled is true, on client this entity's position information is sent to the server.
+    /** @remark Interest management */
+    EntityWeakPtr observer;
 };
 
 }
