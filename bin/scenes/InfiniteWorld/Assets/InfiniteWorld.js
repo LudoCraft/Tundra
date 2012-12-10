@@ -6,6 +6,8 @@
 // !ref: SceneBlockOnlyTerrain.txml
 // !ref: SceneBlockOneNpc.txml
 // !ref: SceneBlockMultipleNpcs.txml
+// !ref: WaypointBot.txml
+// !ref: FireEaterBot.txml
 
 // TODOs:
 // 1) Get FireEaters working
@@ -80,6 +82,8 @@ function Start()
 
 function Stop()
 {
+    if (framework.IsExiting())
+        return;
     if (server.IsRunning())
     {
         for(var i = 0; i < numRows; ++i)
@@ -152,9 +156,9 @@ function SceneBlockAt(pos)
 function InstantiateSceneBlock(pos, rowIdx, colIdx)
 {
     // Flat terrain
-//    var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrainFlat.txml").DiskSource();
+    var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrainFlat.txml").DiskSource();
     // Terrain
-    var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrain.txml").DiskSource();
+    //var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrain.txml").DiskSource();
     // Terrain + 1 FireEater:
     //var sceneBlockFile = asset.GetAsset("SceneBlockOneNpc.txml").DiskSource();
     // Terrain + 63 FireEaters:
@@ -173,20 +177,42 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
     var blockName = rowIdx.toString() + "," + colIdx.toString()
     entities[0].name = "Terrain" + blockName;
 
-    // Set up FireEaters
-    if (entities.length > 1)
+    // TODO aabb copied from SceneBlock ctor
+    var aabb = new AABB(pos, new float3(pos.x + blockWidth, blockHeight, pos.z + blockWidth));
+//    var botPrefab = asset.GetAsset("FireEaterBot.txml").DiskSource();
+    var botPrefab = asset.GetAsset("WaypointBot.txml").DiskSource();
+    const numBots = 3;
+    var bots = [];
+    for(i = 0; i < numBots; ++i)
     {
-        var fireEaterPos = new float3(pos);
-        fireEaterPos.x += blockWidth/2;
-        fireEaterPos.y += 40;
-        fireEaterPos.z += blockWidth/2;
-        entities[1].placeable.SetPosition(fireEaterPos);
+        var bot = scene.LoadSceneXML(botPrefab, false, false, 0);
+        var randomPos = aabb.PointInside(Math.random(), 0.01, Math.random());
+        bot[0].placeable.SetPosition(randomPos);
+        bots.push(bot[0]);
     }
 
-    var newBlock = new SceneBlock(blockName, rowIdx, colIdx, pos);
-    newBlock.entities = entities;
+    // Set up FireEaters
+    /*
+    if (entities.length > 1)
+    {
+        for(i = 1; i < entities.length; ++i)
+        {
+            var fireEaterPos = new float3(pos);
+            fireEaterPos.x += blockWidth/2;
+            //fireEaterPos.y += 40;
+            fireEaterPos.y = entities[0].terrain.GetPoint(pos.x, pos.z) + 1;
+            Log(fireEaterPos);
+            fireEaterPos.z += blockWidth/2;
+            entities[1].placeable.SetPosition(fireEaterPos);
+        }
+    }
+    */
 
+    var newBlock = new SceneBlock(blockName, rowIdx, colIdx, pos);
+    //newBlock.entities = entities;
+    newBlock.entities = entities.concat(bots);
     Log("Scene block " + newBlock + " instantiated at " + entities[0].terrain.nodeTransformation.pos);
+    
 
     return newBlock;
 }

@@ -12,7 +12,7 @@
    <attribute value="0.129999995" name="Tex. U scale"/>
    <attribute value="0.129999995" name="Tex. V scale"/>
    <attribute value="Ogre Media:RexTerrainPCF.material" name="Material"/>
-   <attribute value="TerrainHeightmap128x128.ntf" name="Heightmap"/>
+   <attribute value="TerrainFlat128x128.ntf" name="Heightmap"/>
   </component>
   <component type="EC_RigidBody" sync="1">
    <attribute value="0" name="Mass"/>
@@ -544,6 +544,7 @@
    <attribute value="-1" name="Collision Mask"/>
   </component>
  </entity>
+ <!--
  <entity id="12" sync="1">
   <component type="EC_Placeable" sync="1">
    <attribute value="160.449493,59.750717,196.304916,0.000000,-108.070999,0.000000,1.000000,1.000000,1.000000" name="Transform"/>
@@ -1411,6 +1412,7 @@
    <attribute value="-1" name="Collision Mask"/>
   </component>
  </entity>
+ 
  <entity id="29" sync="1">
   <component type="EC_Placeable" sync="1">
    <attribute value="166.092300,59.750717,187.628677,0.000000,-108.070999,0.000000,1.000000,1.000000,1.000000" name="Transform"/>
@@ -3247,4 +3249,5 @@
    <attribute value="-1" name="Collision Mask"/>
   </component>
  </entity>
+ -->
 </scene>
