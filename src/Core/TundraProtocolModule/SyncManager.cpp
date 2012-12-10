@@ -108,11 +108,14 @@ SyncManager::SyncManager(TundraLogicModule* owner) :
     KristalliProtocolModule *kristalli = framework_->GetModule<KristalliProtocolModule>();
     connect(kristalli, SIGNAL(NetworkMessageReceived(kNet::MessageConnection *, kNet::packet_id_t, kNet::message_id_t, const char *, size_t)), 
         this, SLOT(HandleKristalliMessage(kNet::MessageConnection*, kNet::packet_id_t, kNet::message_id_t, const char*, size_t)));
-    
-    /// @todo Read "interestManagement" command line paremeter for enabling/disabling IM and for possible setting configuration.
+
+    QStringList imArg = framework_->CommandLineParameters("--interestManagement");
+    if (!imArg.empty())
+        SetInterestManagementEnabled(ParseBool(imArg.last()));
+
     if (framework_->HasCommandLineParameter("--noclientphysics"))
         noClientPhysicsHandoff_ = true;
-    
+
     GetClientExtrapolationTime();
 }
 
@@ -713,10 +716,11 @@ void SyncManager::Update(f64 frametime)
         for(UserConnectionList::iterator i = users.begin(); i != users.end(); ++i)
             if ((*i)->syncState)
             {
-                // First send out all changes to rigid bodies.
+                // First send out all changes to rigid bodies, if IM not enabled.
                 // After processing this function, the bits related to rigid body states have been cleared,
                 // so the generic sync will not double-replicate the rigid body positions and velocities.
-                ReplicateRigidBodyChanges((*i)->connection, (*i)->syncState.get());
+                if (!interestManagementEnabled)
+                    ReplicateRigidBodyChanges((*i)->connection, (*i)->syncState.get());
                 // Then send out changes to other attributes via the generic sync mechanism.
                 ProcessSyncState((*i)->connection, (*i)->syncState.get());
             }
@@ -2464,7 +2468,7 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
     }
 
     /// @todo Hardcoded relevancy 2 for entities with Avatar component and 1 for others for now.
-    entityState->relevancy = entity->GetComponent("EC_Avatar") ? 2.f : 1.f;
+    entityState->relevancy = entity->GetComponent("EC_Avatar") ? 10.f : 1.f;
 //    if (entity->GetComponent("EC_Avatar"))//!EqualAbs(oldPrio, entityState->PrioritizedUpdateInterval()))
 //        LogDebug(QString("IM: %1 prio %2 rel %3 updateInterval %4").arg(entity->ToString()).arg(entityState->priority).arg(entityState->relevancy).arg(entityState->PrioritizedUpdateInterval()));
 }
