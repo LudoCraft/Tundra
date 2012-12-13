@@ -17,6 +17,13 @@ set TUNDRA_BIN=%CD%\bin
 set DEPS=%CD%\deps
 cd %TOOLS%
 
+:: TODO: Fix all clumsy IFs below to use %RELEASE_CONFIGURATION% instead.
+if %BUILD_RELEASE% == TRUE (
+   set RELEASE_CONFIGURATION=Release
+) ELSE (
+   set RELEASE_CONFIGURATION=RelWithDebInfo
+)
+
 :: Make sure deps folder exists.
 IF NOT EXIST "%DEPS%". mkdir "%DEPS%"
 
@@ -918,6 +925,28 @@ IF NOT EXIST "%DEPS%\zziplib". (
    copy /Y ..\zzip\*.h ..\..\include\zzip
 ) ELSE (
    cecho {0D}zlib 1.2.7 already built. Skipping.{# #}{\n}
+)
+
+
+IF NOT EXIST "%DEPS%\angelscript\.svn". (
+   cd "%DEPS%"
+   cecho {0D}Checking out angelscript into "%DEPS%\angelscript".{# #}{\n}
+   svn co https://angelscript.svn.sourceforge.net/svnroot/angelscript/tags/2.25.2/ angelscript
+) ELSE (
+   cecho {0D}Angelscript repository already cloned. Skipping. {# #}{\n}
+)
+
+:: Make an out-of-source cmake build to angelscript\build.
+IF NOT EXIST "%DEPS%\angelscript\build". (
+   cd "%DEPS%\angelscript"
+   mkdir build
+   cd build
+   cmake -G %GENERATOR% ../sdk/angelscript/projects/cmake
+
+   msbuild angelscript.sln /p:configuration=Debug /nologo
+   msbuild angelscript.sln /p:configuration=%RELEASE_CONFIGURATION% /nologo
+) ELSE (
+   cecho {0D}Angelscript already built. Skipping. {# #}{\n}
 )
 
 echo.
