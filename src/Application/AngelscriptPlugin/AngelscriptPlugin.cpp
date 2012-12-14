@@ -9,6 +9,7 @@
 #include "Scene/Scene.h"
 #include "IComponent.h"
 #include "EC_Script.h"
+#include "AngelscriptInstance.h"
 
 #include <angelscript.h>
 #include <scriptstdstring/scriptstdstring.h>
@@ -40,12 +41,14 @@ DEFINE_STATIC_PLUGIN_MAIN(AngelscriptPlugin)
 
 void AngelscriptModule::Initialize()
 {
+    CreateScriptEngine();
+
     QObject::connect(GetFramework()->Scene(), SIGNAL(SceneAdded(const QString&)), this, SLOT(OnSceneAdded(const QString&)));
 }
 
 void AngelscriptModule::CreateScriptEngine()
 {
-    LogDebug("AngelscriptModule::CreateScriptEngine");
+    LogInfo("AngelscriptModule::CreateScriptEngine");
     engine = asCreateScriptEngine(ANGELSCRIPT_VERSION);
 }
 
@@ -67,5 +70,25 @@ void AngelscriptModule::OnComponentAdded(Entity *entity, IComponent *component)
 
 void AngelscriptModule::OnScriptAssetsChanged(const std::vector<ScriptAssetPtr>& newScripts)
 {
-    // Reload the script.
+    EC_Script *sender = dynamic_cast<EC_Script*>(this->sender());
+    assert(sender && "JavascriptModule::ScriptAssetsChanged needs to be invoked from EC_Script!");
+    if (!sender)
+        return;
+    if (newScripts.empty())
+    {
+        LogError("Script asset vector was empty");
+        return;
+    }
+
+    Q_FOREACH(ScriptAssetPtr script, newScripts)
+    {
+        if (script->Name().endsWith(".as", Qt::CaseInsensitive))
+        {
+            ScriptInstance *scriptInstance = sender->ScriptInstance();
+            if (!scriptInstance)
+            {
+                scriptInstance = new AngelscriptInstance(script->Name(), framework->GetModule<JavascriptModule>());
+            }
+        }
+    }
 }
