@@ -920,6 +920,32 @@ IF NOT EXIST "%DEPS%\zziplib". (
    cecho {0D}zlib 1.2.7 already built. Skipping.{# #}{\n}
 )
 
+:: LibRocket
+cd "%DEPS%"
+IF NOT EXIST "%DEPS%\libRocket". (
+   cecho {0D}Cloning libRocket from https://github.com/lloydw/libRocket.git into "%DEPS%\libRocket".{# #}{\n}
+   call git clone https://github.com/lloydw/libRocket.git libRocket
+   IF NOT EXIST "%DEPS%\libRocket\.git" GOTO :ERROR
+)
+IF NOT EXIST "%DEPS%\support". (
+   cecho {0D}Downloading libRocket support files".{# #}{\n}
+   wget http://librocket.com/download/41?startdownload -Olibrocket_support-1.2.1.zip
+   IF NOT %ERRORLEVEL%==0 GOTO :ERROR
+   7za x -y -o. librocket_support-1.2.1.zip
+)
+IF NOT EXIST "%DEPS%\libRocket\bin\RocketCore.lib". /
+   cecho {0D}Building libRocket. Please be patient, this will take a while.{# #}{\n}
+   cd "%DEPS%\libRocket\Build"
+   msbuild Rocket.sln /p:configuration=Debug /nologo
+   msbuild Rocket.sln /p:configuration=Release /nologo
+   IF NOT %ERRORLEVEL%==0 GOTO :ERROR
+   cd "%DEPS%"
+)
+IF NOT EXIST "%TUNDRA_BIN%\RocketCore.dll". (
+   cecho {0D}Deploying libRocket DLLs to Tundra bin\.{# #}{\n}
+   copy /Y "%DEPS%\libRocket\bin\*.dll" "%TUNDRA_BIN%"
+)
+
 echo.
 cecho {0A}Tundra dependencies built.{# #}{\n}
 set PATH=%ORIGINAL_PATH%
