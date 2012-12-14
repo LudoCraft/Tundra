@@ -52,6 +52,14 @@ namespace OgreRenderer
         /// Scene is about to be removed
         void OnSceneRemoved(const QString &name);
 
+    signals:
+        /// A new OgreWorld has been created
+        void OgreWorldCreated(OgreWorld* world);
+        
+        /// An OgreWorld is about to be destroyed
+        void OgreWorldAboutToBeRemoved(OgreWorld* world);
+
+
     private:
         RendererPtr renderer;  ///< Renderer
     };

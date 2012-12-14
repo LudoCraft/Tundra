@@ -71,6 +71,9 @@ namespace OgreRenderer
         /// Returns current render window
         Ogre::RenderWindow* GetCurrentRenderWindow() const;
 
+        /// Returns the dummy scene's scene manager
+        Ogre::SceneManager* GetDefaultSceneManager() const { return defaultScene; }
+
         /// Returns currently active Ogre camera
         /** @note in case there is no active camera, will not return the default (dummy) camera, but 0 */
         Ogre::Camera* MainOgreCamera() const;
@@ -193,7 +196,7 @@ namespace OgreRenderer
         /** The pointer specified in this signal may be null, if the main camera was set to null.
             If the specified entity is non-zero, it is guaranteed to have an EC_Camera component, and it is attached to some scene. */
         void MainCameraChanged(Entity *newMainWindowCamera);
-
+        
     private slots:
         /// Embeds the Renderer types to the given script engine.
         void OnScriptEngineCreated(QScriptEngine* engine);

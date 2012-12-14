@@ -4,6 +4,9 @@
 #include "IModule.h"
 #include "LibRocketPluginApi.h"
 
+#include <Ogre/OgreRenderQueueListener.h>
+
+class OgreWorld;
 class RenderInterfaceOgre3D;
 class SystemInterfaceTundra;
 
@@ -15,21 +18,41 @@ namespace Rocket
     }
 }
 
-class LIBROCKETPLUGIN_API LibRocketPlugin : public IModule
+class LIBROCKETPLUGIN_API LibRocketPlugin : public IModule, public Ogre::RenderQueueListener
 {
     Q_OBJECT
-
+    
 public:
     LibRocketPlugin();
     ~LibRocketPlugin();
-
+    
     // IModule override
     void Initialize();
-
+    
     // IModule override
     void Uninitialize();
-
+    
+    // IModule override
+    void Update(f64 timeStep);
+    
+    /// Return the LibRocket UI context
+    Rocket::Core::Context* GetContext() { return context; }
+    
+    /// Called from Ogre before a queue group is rendered. Used for Rocket UI rendering.
+    virtual void renderQueueStarted(unsigned char queueGroupId, const Ogre::String& invocation, bool& skipThisInvocation);
+    
+private slots:
+    /// Resize LibRocket UI context when Ogre renderwindow changes size
+    void OnRenderWindowResized(int width, int height);
+    
+    /// Create Rocket renderqueue listener to a new scene
+    void OnOgreWorldCreated(OgreWorld* world);
+    
 private:
+    /// Configure Ogre for UI rendering
+    void ConfigureRenderSystem();
+    
     RenderInterfaceOgre3D* renderInterface;
     SystemInterfaceTundra* systemInterface;
+    Rocket::Core::Context* context;
 };

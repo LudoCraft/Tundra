@@ -280,6 +280,8 @@ void OgreRenderingModule::OnSceneAdded(const QString& name)
     OgreWorldPtr newWorld = boost::make_shared<OgreWorld>(renderer.get(), scene);
     renderer->ogreWorlds[scene.get()] = newWorld;
     scene->setProperty(OgreWorld::PropertyName(), QVariant::fromValue<QObject*>(newWorld.get()));
+    
+    emit OgreWorldCreated(newWorld.get());
 }
 
 void OgreRenderingModule::OnSceneRemoved(const QString& name)
@@ -295,6 +297,7 @@ void OgreRenderingModule::OnSceneRemoved(const QString& name)
     OgreWorld* worldPtr = scene->GetWorld<OgreWorld>().get();
     if (worldPtr)
     {
+        emit OgreWorldAboutToBeRemoved(worldPtr);
         scene->setProperty(OgreWorld::PropertyName(), QVariant());
         renderer->ogreWorlds.erase(scene.get());
     }
