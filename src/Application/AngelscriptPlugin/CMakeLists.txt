@@ -1,3 +1,8 @@
+set(ASCRIPT_DIR ${ENV_TUNDRA_DEP_PATH}/angelscript)
+include_directories(${ASCRIPT_DIR}/sdk/angelscript/include)
+include_directories(${ASCRIPT_DIR}/sdk/add_on)
+link_directories(${ASCRIPT_DIR}/sdk/angelscript/lib)
+
 # Define target name and output directory
 init_target (AngelscriptPlugin OUTPUT plugins)
 
@@ -28,6 +33,8 @@ link_package(QT4)
 link_ogre()
 link_modules(TundraCore Math JavascriptModule)
 link_entity_components(EC_Script)
+
+target_link_libraries(${TARGET_NAME} Angelscript)
 
 SetupCompileFlags()
 

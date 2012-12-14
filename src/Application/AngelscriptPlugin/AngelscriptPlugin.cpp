@@ -10,8 +10,17 @@
 #include "IComponent.h"
 #include "EC_Script.h"
 
+#include <angelscript.h>
+#include <scriptstdstring/scriptstdstring.h>
+#include <scriptbuilder/scriptbuilder.h>
+#include <scriptarray/scriptarray.h>
+#include <scriptstdstring/scriptstdstring.cpp>
+#include <scriptbuilder/scriptbuilder.cpp>
+#include <scriptarray/scriptarray.cpp>
+#include "LoggingFunctions.h"
+
 AngelscriptModule::AngelscriptModule()
-:IModule("Angelscript")
+:IModule("Angelscript"), engine(0), context(0)
 {
 }
 
@@ -32,6 +41,12 @@ DEFINE_STATIC_PLUGIN_MAIN(AngelscriptPlugin)
 void AngelscriptModule::Initialize()
 {
     QObject::connect(GetFramework()->Scene(), SIGNAL(SceneAdded(const QString&)), this, SLOT(OnSceneAdded(const QString&)));
+}
+
+void AngelscriptModule::CreateScriptEngine()
+{
+    LogDebug("AngelscriptModule::CreateScriptEngine");
+    engine = asCreateScriptEngine(ANGELSCRIPT_VERSION);
 }
 
 void AngelscriptModule::OnSceneAdded(const QString &name)
