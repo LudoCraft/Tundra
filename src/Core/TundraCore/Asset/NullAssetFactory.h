@@ -35,8 +35,10 @@ public:
 
     virtual AssetPtr CreateEmptyAsset(AssetAPI *, const QString &) { return AssetPtr(); }
 
+    virtual void SetTypeExtensions(const QStringList &extensions) { assetTypeExtensions = extensions; }
+
 private:
     const QString assetType;
-    const QStringList assetTypeExtensions;
+    QStringList assetTypeExtensions;
 };
 

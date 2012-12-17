@@ -19,9 +19,11 @@ public:
 
     /// Returns the file extension of assets that this asset type factory can create.
     virtual const QStringList &TypeExtensions() const = 0;
-    
+
     /// Creates a new asset of the given type that is initialized to the "empty" asset of this type.
     /// @param name The name to give for this asset.
     virtual AssetPtr CreateEmptyAsset(AssetAPI *owner, const QString &name) = 0;
+
+    virtual void SetTypeExtensions(const QStringList &extensions) = 0;
 };
 

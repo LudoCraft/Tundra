@@ -36,9 +36,10 @@ public:
 
     virtual AssetPtr CreateEmptyAsset(AssetAPI *owner, const QString &name) { return boost::make_shared<AssetType>(owner, Type(), name); }
 
+    virtual void SetTypeExtensions(const QStringList &extensions) { assetTypeExtensions = extensions; }
 private:
     const QString assetType;
-    const QStringList assetTypeExtensions;
+    QStringList assetTypeExtensions;
 };
 
 /// For simple asset types the client wants to parse, we define the BinaryAssetFactory type.

@@ -1101,7 +1101,14 @@ void AssetAPI::RegisterAssetTypeFactory(AssetTypeFactoryPtr factory)
     AssetTypeFactoryPtr existingFactory = GetAssetTypeFactory(factory->Type());
     if (existingFactory)
     {
-        LogWarning("AssetAPI::RegisterAssetTypeFactory: Factory with type '" + factory->Type() + "' already registered.");
+        // Adding new file suffixes to an existing type factory. Merge the set of new and old file extensions to be supported
+        // by that factory.
+        QStringList newExtensions = factory->TypeExtensions();
+        QStringList existingExtensions = existingFactory->TypeExtensions();
+        newExtensions = existingExtensions + newExtensions;
+        newExtensions.removeDuplicates();
+        LogInfo("New extensions: " + newExtensions.join(" "));
+        existingFactory->SetTypeExtensions(newExtensions);
         return;
     }
 
