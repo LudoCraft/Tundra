@@ -1107,7 +1107,6 @@ void AssetAPI::RegisterAssetTypeFactory(AssetTypeFactoryPtr factory)
         QStringList existingExtensions = existingFactory->TypeExtensions();
         newExtensions = existingExtensions + newExtensions;
         newExtensions.removeDuplicates();
-        LogInfo("New extensions: " + newExtensions.join(" "));
         existingFactory->SetTypeExtensions(newExtensions);
         return;
     }
