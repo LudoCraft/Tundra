@@ -24,6 +24,9 @@
 #include <scriptarray/scriptarray.cpp>
 #include "LoggingFunctions.h"
 
+#include "aswrappedcall_17.h"
+#include "angelscript_symbols_cpp.h"
+
 AngelscriptModule::AngelscriptModule()
 :IModule("Angelscript"), engine(0), context(0)
 {
