@@ -27,9 +27,9 @@
 
 #pragma once
 
-#include <Rocket/Core/SystemInterface.h>
-
 #include "FrameworkFwd.h"
+
+#include <Rocket/Core/SystemInterface.h>
 
 class SystemInterfaceTundra : public Rocket::Core::SystemInterface
 {

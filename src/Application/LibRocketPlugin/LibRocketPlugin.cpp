@@ -1,5 +1,10 @@
+// For conditions of distribution and use, see copyright notice in LICENSE
+
 #include "CoreDefines.h"
 #include "Framework.h"
+#include "Application.h"
+#include "EC_RocketUiDocument.h"
+#include "IComponentFactory.h"
 #include "LoggingFunctions.h"
 #include "LibRocketPlugin.h"
 #include "OgreRenderingModule.h"
@@ -7,6 +12,7 @@
 #include "Renderer.h"
 #include "RenderWindow.h"
 #include "RenderInterfaceOgre3D.h"
+#include "SceneAPI.h"
 #include "SystemInterfaceTundra.h"
 
 #include <Ogre/OgreSceneManager.h>
@@ -15,6 +21,7 @@
 #undef IN
 #endif
 #include <Rocket/Core.h>
+#include <Rocket/Core/ElementDocument.h>
 
 LibRocketPlugin::LibRocketPlugin() :
     IModule("LibRocketPlugin"),
@@ -49,7 +56,7 @@ void LibRocketPlugin::Initialize()
     QObject::connect(rw, SIGNAL(Resized(int, int)), this, SLOT(OnRenderWindowResized(int, int)));
     
     systemInterface = new SystemInterfaceTundra(GetFramework());
-    renderInterface = new RenderInterfaceOgre3D(rw->Width(), rw->Height());
+    renderInterface = new RenderInterfaceOgre3D(GetFramework(), rw->Width(), rw->Height());
     Rocket::Core::SetSystemInterface(systemInterface);
     Rocket::Core::SetRenderInterface(renderInterface);
     Rocket::Core::Initialise();
@@ -63,7 +70,7 @@ void LibRocketPlugin::Initialize()
     QObject::connect(module, SIGNAL(OgreWorldCreated(OgreWorld*)), this, SLOT(OnOgreWorldCreated(OgreWorld*)));
 }
 
-void LibRocketPlugin::Uninitialize()
+void LibRocketPlugin::Unload()
 {
     if (context)
     {
@@ -210,6 +217,7 @@ extern "C"
 DLLEXPORT void TundraPluginMain(Framework *fw)
 {
     Framework::SetInstance(fw); // Inside this DLL, remember the pointer to the global framework object.
+    fw->Scene()->RegisterComponentFactory(ComponentFactoryPtr(new GenericComponentFactory<EC_RocketUiDocument>()));
     IModule *module = new LibRocketPlugin();
     fw->RegisterModule(module);
 }

@@ -1,3 +1,5 @@
+// For conditions of distribution and use, see copyright notice in LICENSE
+
 #pragma once
 
 #include "CoreTypes.h"
@@ -18,6 +20,7 @@ namespace Rocket
     }
 }
 
+/// LibRocket UI interface plugin. Instantiates the Rocket UI.
 class LIBROCKETPLUGIN_API LibRocketPlugin : public IModule, public Ogre::RenderQueueListener
 {
     Q_OBJECT
@@ -30,7 +33,7 @@ public:
     void Initialize();
     
     // IModule override
-    void Uninitialize();
+    void Unload();
     
     // IModule override
     void Update(f64 timeStep);
