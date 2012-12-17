@@ -56,15 +56,7 @@ void JavascriptModule::Load()
     if (!framework_->Scene()->IsComponentFactoryRegistered(EC_Script::TypeNameStatic()))
         framework_->Scene()->RegisterComponentFactory(ComponentFactoryPtr(new GenericComponentFactory<EC_Script>));
 
-    // This check is done as both js and py modules can register this factory. 
-    // They both need to register .js and .py extensions to play nice.
-    // @todo Refactor to separate the .js and .py assets to be in separate factories.
-    if (!framework_->Asset()->IsAssetTypeFactoryRegistered("Script"))
-    {
-        QStringList scriptExtensions;
-        scriptExtensions << ".js" << ".py";
-        framework_->Asset()->RegisterAssetTypeFactory(AssetTypeFactoryPtr(new GenericAssetFactory<ScriptAsset>("Script", scriptExtensions)));
-    }
+    framework_->Asset()->RegisterAssetTypeFactory(AssetTypeFactoryPtr(new GenericAssetFactory<ScriptAsset>("Script", ".js")));
 }
 
 void JavascriptModule::Initialize()
