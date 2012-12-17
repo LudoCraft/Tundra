@@ -4,12 +4,16 @@
 #include <string>
 
 #include "Framework.h"
+#include "AssetAPI.h"
+#include "GenericAssetFactory.h"
 #include "AngelscriptPlugin.h"
+#include "JavascriptModule.h"
 #include "SceneAPI.h"
 #include "Scene/Scene.h"
 #include "IComponent.h"
 #include "EC_Script.h"
 #include "AngelscriptInstance.h"
+#include "ScriptAsset.h"
 
 #include <angelscript.h>
 #include <scriptstdstring/scriptstdstring.h>
@@ -39,6 +43,11 @@ DEFINE_STATIC_PLUGIN_MAIN(AngelscriptPlugin)
 }
 }
 
+void AngelscriptModule::Load()
+{
+    framework_->Asset()->RegisterAssetTypeFactory(AssetTypeFactoryPtr(new GenericAssetFactory<ScriptAsset>("Script", ".as")));
+}
+
 void AngelscriptModule::Initialize()
 {
     CreateScriptEngine();
@@ -46,10 +55,36 @@ void AngelscriptModule::Initialize()
     QObject::connect(GetFramework()->Scene(), SIGNAL(SceneAdded(const QString&)), this, SLOT(OnSceneAdded(const QString&)));
 }
 
+void MessageCallback(const asSMessageInfo *msg, void *param)
+{
+    char str[512];
+    sprintf(str, "%s (%d, %d) : %s", msg->section, msg->row, msg->col, msg->message);
+    if (msg->type == asMSGTYPE_ERROR)
+        LogError(str);
+    else if (msg->type == asMSGTYPE_WARNING)
+        LogWarning(str);
+    else
+        LogInfo(str);
+}
+
+void print(std::string &msg)
+{
+    LogInfo(msg.c_str());
+}
+
 void AngelscriptModule::CreateScriptEngine()
 {
     LogInfo("AngelscriptModule::CreateScriptEngine");
     engine = asCreateScriptEngine(ANGELSCRIPT_VERSION);
+
+    int r = engine->SetMessageCallback(asFUNCTION(MessageCallback), 0, asCALL_CDECL); assert(r >= 0);
+    RegisterStdString(engine);
+    r = engine->RegisterGlobalFunction("void print(const string &in)", asFUNCTION(print), asCALL_CDECL); assert(r >= 0);
+
+    RegisterScriptArray(engine, true);
+
+    context = engine->CreateContext();
+    assert(context != 0);
 }
 
 void AngelscriptModule::OnSceneAdded(const QString &name)
@@ -80,15 +115,25 @@ void AngelscriptModule::OnScriptAssetsChanged(const std::vector<ScriptAssetPtr>&
         return;
     }
 
+    IScriptInstance *scriptInstance = sender->ScriptInstance();
+
+    ///\todo Add support for multiple angelscript scripts.
     Q_FOREACH(ScriptAssetPtr script, newScripts)
     {
         if (script->Name().endsWith(".as", Qt::CaseInsensitive))
         {
-            ScriptInstance *scriptInstance = sender->ScriptInstance();
             if (!scriptInstance)
             {
-                scriptInstance = new AngelscriptInstance(script->Name(), framework->GetModule<JavascriptModule>());
+                scriptInstance = new AngelscriptInstance(script, this);
             }
         }
+    }
+
+    if (sender->runOnLoad.Get() && sender->ShouldRun())
+    {
+        bool isApplication = !sender->applicationName.Get().trimmed().isEmpty();
+        if (isApplication && framework_->HasCommandLineParameter("--disablerunonload"))
+            return;
+        scriptInstance->Run();
     }
 }

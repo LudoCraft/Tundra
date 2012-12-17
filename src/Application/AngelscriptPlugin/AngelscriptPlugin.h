@@ -14,7 +14,11 @@ class AngelscriptModule : public IModule
 public:
     AngelscriptModule();
 
+    void Load();
     void Initialize();
+
+    asIScriptEngine *Engine() { return engine; }
+    asIScriptContext *Context() { return context; }
 
 private slots:
     void OnSceneAdded(const QString &name);
