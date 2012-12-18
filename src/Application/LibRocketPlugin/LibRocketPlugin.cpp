@@ -22,6 +22,7 @@
 #ifdef IN
 #undef IN
 #endif
+#include <Rocket/Controls.h>
 #include <Rocket/Core.h>
 #include <Rocket/Core/ElementDocument.h>
 
@@ -62,6 +63,7 @@ void LibRocketPlugin::Initialize()
     Rocket::Core::SetSystemInterface(systemInterface);
     Rocket::Core::SetRenderInterface(renderInterface);
     Rocket::Core::Initialise();
+    Rocket::Controls::Initialise();
     
     context = Rocket::Core::CreateContext(Rocket::Core::String("Tundra"), Rocket::Core::Vector2i(rw->Width(), rw->Height()), renderInterface);
     
