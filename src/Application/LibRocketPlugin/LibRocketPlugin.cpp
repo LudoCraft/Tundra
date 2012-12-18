@@ -68,6 +68,27 @@ void LibRocketPlugin::Initialize()
     if (sm)
         sm->addRenderQueueListener(this);
     QObject::connect(module, SIGNAL(OgreWorldCreated(OgreWorld*)), this, SLOT(OnOgreWorldCreated(OgreWorld*)));
+    
+    // Windows only for now: get system font path and add default fonts
+#ifdef WIN32
+    Rocket::Core::String systemFontPath;
+    char expandedSystemPath[256];
+    
+    if (ExpandEnvironmentStringsA("%WinDir%", expandedSystemPath, 256))
+        systemFontPath = Rocket::Core::String(expandedSystemPath) + "\\Fonts\\";
+    
+    Rocket::Core::String defaultFontNames[] = {
+        "arial.ttf",
+        ""
+    };
+    
+    unsigned idx = 0;
+    while (defaultFontNames[idx].Length())
+    {
+        Rocket::Core::FontDatabase::LoadFontFace(systemFontPath + defaultFontNames[idx]);
+        ++idx;
+    }
+#endif
 }
 
 void LibRocketPlugin::Unload()
