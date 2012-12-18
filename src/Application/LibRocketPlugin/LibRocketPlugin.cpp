@@ -3,7 +3,9 @@
 #include "CoreDefines.h"
 #include "Framework.h"
 #include "Application.h"
+#include "AssetAPI.h"
 #include "EC_RocketUiDocument.h"
+#include "IAssetTransfer.h"
 #include "IComponentFactory.h"
 #include "LoggingFunctions.h"
 #include "LibRocketPlugin.h"
@@ -37,26 +39,26 @@ LibRocketPlugin::~LibRocketPlugin()
 
 void LibRocketPlugin::Initialize()
 {
-    if (GetFramework()->IsHeadless())
+    if (framework_->IsHeadless())
         return;
     
-    OgreRenderer::OgreRenderingModule* module = GetFramework()->GetModule<OgreRenderer::OgreRenderingModule>();
+    OgreRenderer::OgreRenderingModule* module = framework_->GetModule<OgreRenderer::OgreRenderingModule>();
     OgreRenderer::RendererPtr renderer = module->GetRenderer();
     if (!renderer)
     {
-        LogError("Framework is not headless, but no renderer object! Skipping LibRocketPlugin initialization.");
+        LogError("LibRocketPlugin: framework is not headless, but no renderer object! Skipping initialization.");
         return;
     }
     RenderWindow* rw = renderer->GetRenderWindow();
     if (!rw)
     {
-        LogError("Framework is not headless, but no renderwindow object! Skipping LibRocketPlugin initialization.");
+        LogError("LibRocketPlugin: framework is not headless, but no renderwindow object! Skippinginitialization.");
         return;
     }
     QObject::connect(rw, SIGNAL(Resized(int, int)), this, SLOT(OnRenderWindowResized(int, int)));
     
-    systemInterface = new SystemInterfaceTundra(GetFramework());
-    renderInterface = new RenderInterfaceOgre3D(GetFramework(), rw->Width(), rw->Height());
+    systemInterface = new SystemInterfaceTundra(framework_);
+    renderInterface = new RenderInterfaceOgre3D(framework_, rw->Width(), rw->Height());
     Rocket::Core::SetSystemInterface(systemInterface);
     Rocket::Core::SetRenderInterface(renderInterface);
     Rocket::Core::Initialise();
@@ -89,6 +91,38 @@ void LibRocketPlugin::Initialize()
         ++idx;
     }
 #endif
+    
+    framework_->RegisterDynamicObject("rocketui", this);
+}
+
+void LibRocketPlugin::LoadFont(const QString& assetRef)
+{
+    AssetAPI* assetAPI = framework_->Asset();
+    // If possible, try to install the font immediately
+    AssetPtr asset = assetAPI->GetAsset(assetRef);
+    if (asset)
+    {
+        LogInfo("LibRocketPlugin: loading font " + asset->Name());
+        Rocket::Core::FontDatabase::LoadFontFace(Rocket::Core::String(asset->DiskSource().toStdString().c_str()));
+        return;
+    }
+    
+    // Else make an asset request
+    AssetTransferPtr transfer = assetAPI->RequestAsset(assetRef);
+    if (transfer)
+        QObject::connect(transfer.get(), SIGNAL(Succeeded(AssetPtr)), this, SLOT(OnFontAssetLoaded(AssetPtr)), Qt::UniqueConnection);
+}
+
+void LibRocketPlugin::OnFontAssetLoaded(AssetPtr asset)
+{
+    if (!asset)
+    {
+        LogError("LibRocketPlugin: Null font asset");
+        return;
+    }
+    
+    LogInfo("LibRocketPlugin: loading font " + asset->Name());
+    Rocket::Core::FontDatabase::LoadFontFace(Rocket::Core::String(asset->DiskSource().toStdString().c_str()));
 }
 
 void LibRocketPlugin::Unload()

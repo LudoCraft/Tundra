@@ -17,6 +17,7 @@
 EC_RocketUiDocument::EC_RocketUiDocument(Scene* scene) :
     IComponent(scene),
     documentRef(this, "Document ref", AssetReference("", "BinaryAsset")),
+    visible(this, "Visible", true),
     document(0)
 {
     documentAsset = AssetRefListenerPtr(new AssetRefListener());
@@ -35,6 +36,13 @@ void EC_RocketUiDocument::AttributesChanged()
     
     if (documentRef.ValueChanged())
         documentAsset->HandleAssetRefChange(&documentRef);
+    if (visible.ValueChanged() && document)
+    {
+        if (visible.Get())
+            document->Show();
+        else
+            document->Hide();
+    }
 }
 
 void EC_RocketUiDocument::OnDocumentAssetLoaded(AssetPtr asset)
@@ -57,8 +65,12 @@ void EC_RocketUiDocument::OnDocumentAssetLoaded(AssetPtr asset)
 
     document = context->LoadDocument(Rocket::Core::String(asset->DiskSource().toStdString().c_str()));
     if (!document)
+    {
         LogError("Failed to instantiate Rocket UI document");
-    else
+        return;
+    }
+    
+    if (visible.Get())
         document->Show();
 }
 

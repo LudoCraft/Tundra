@@ -16,6 +16,32 @@ namespace Rocket
     }
 }
 
+/// Rocket UI document component.
+/** <table class="header">
+    <tr>
+    <td>
+    <h2>Avatar</h2>
+
+    Registered by LibRocketPlugin.
+
+    <b>Attributes</b>:
+    <ul>
+    <li>AssetReference: documentRef
+    <div> @copydoc documentRef</div>
+    <li>bool: loopSound
+    <div> @copydoc loopSound </div>
+    </ul>
+
+    <b>Exposes the following scriptable functions:</b>
+    <ul>
+    </ul>
+
+    <b>Reacts on the following actions:</b>
+    <ul>
+    </ul>
+
+    Does not emit any actions.
+    </table> */
 class LIBROCKETPLUGIN_API EC_RocketUiDocument : public IComponent
 {
     Q_OBJECT
@@ -24,6 +50,9 @@ class LIBROCKETPLUGIN_API EC_RocketUiDocument : public IComponent
     /// Asset id for the UI document
     Q_PROPERTY(AssetReference documentRef READ getdocumentRef WRITE setdocumentRef);
     DEFINE_QPROPERTY_ATTRIBUTE(AssetReference, documentRef);
+    /// Visible flag
+    Q_PROPERTY(bool visible READ getvisible WRITE setvisible);
+    DEFINE_QPROPERTY_ATTRIBUTE(bool, visible);
     
 public:
     /// Do not directly allocate new components using operator new, but use the factory-based SceneAPI::CreateComponent functions instead.

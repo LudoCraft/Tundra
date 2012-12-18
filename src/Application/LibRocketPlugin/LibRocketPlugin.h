@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "AssetFwd.h"
 #include "CoreTypes.h"
 #include "IModule.h"
 #include "LibRocketPluginApi.h"
@@ -44,9 +45,16 @@ public:
     /// Called from Ogre before a queue group is rendered. Used for Rocket UI rendering.
     virtual void renderQueueStarted(unsigned char queueGroupId, const Ogre::String& invocation, bool& skipThisInvocation);
     
+public slots:
+    /// Load a font from an asset.
+    void LoadFont(const QString& assetRef);
+    
 private slots:
     /// Resize LibRocket UI context when Ogre renderwindow changes size
     void OnRenderWindowResized(int width, int height);
+    
+    /// Handle font asset having been loaded.
+    void OnFontAssetLoaded(AssetPtr asset);
     
     /// Create Rocket renderqueue listener to a new scene
     void OnOgreWorldCreated(OgreWorld* world);
@@ -55,7 +63,10 @@ private:
     /// Configure Ogre for UI rendering
     void ConfigureRenderSystem();
     
+    /// Rocket rendering interface
     RenderInterfaceOgre3D* renderInterface;
+    /// Rocket system interface
     SystemInterfaceTundra* systemInterface;
+    /// Rocket main UI context
     Rocket::Core::Context* context;
 };
