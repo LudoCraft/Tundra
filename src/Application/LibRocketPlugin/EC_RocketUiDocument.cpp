@@ -36,6 +36,7 @@ void EC_RocketUiDocument::AttributesChanged()
     
     if (documentRef.ValueChanged())
         documentAsset->HandleAssetRefChange(&documentRef);
+    
     if (visible.ValueChanged() && document)
     {
         if (visible.Get())
@@ -62,7 +63,8 @@ void EC_RocketUiDocument::OnDocumentAssetLoaded(AssetPtr asset)
         LogError("No Rocket UI context, can not instantiate document");
         return;
     }
-
+    
+    /// \todo Implement using the raw asset data without going through the disk
     document = context->LoadDocument(Rocket::Core::String(asset->DiskSource().toStdString().c_str()));
     if (!document)
     {

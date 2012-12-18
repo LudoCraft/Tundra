@@ -1,0 +1,13 @@
+<!DOCTYPE Scene>
+<scene>
+ <entity id="1" sync="1">
+  <component type="EC_Name" sync="true">
+   <attribute value="RocketUi" name="name"/>
+   <attribute value="" name="description"/>
+  </component>
+  <component type="EC_RocketUiDocument" sync="true">
+   <attribute value="hud.rml" name="Document ref"/>
+   <attribute value="true" name="Visible"/>
+  </component>
+ </entity>
+</scene>
