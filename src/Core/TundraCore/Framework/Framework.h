@@ -173,7 +173,8 @@ public slots:
     void PrintDynamicObjects();
 
 private:
-    Q_DISABLE_COPY(Framework)
+    Framework(const Framework &);
+    Framework &operator=(const Framework &);
 
     /// Appends all found startup options from the given file to the startupOptions member.
     void LoadStartupOptionsFromXML(QString configurationFile);
