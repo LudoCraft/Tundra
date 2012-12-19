@@ -12,5 +12,13 @@
    <attribute value="" name="Script application name"/>
    <attribute value="" name="Script class name"/>
   </component>
+  <component type="EC_Placeable" sync="true">
+   <attribute value="1.000000,2.000000,3.000000,0.000000,0.000000,0.000000,1.000000,1.000000,1.000000" name="Transform"/>
+   <attribute value="false" name="Show bounding box"/>
+   <attribute value="true" name="Visible"/>
+   <attribute value="1" name="Selection layer"/>
+   <attribute value="" name="Parent entity ref"/>
+   <attribute value="" name="Parent bone name"/>
+  </component>
  </entity>
 </scene>

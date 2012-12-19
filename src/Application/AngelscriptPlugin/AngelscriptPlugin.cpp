@@ -98,6 +98,16 @@ void print(std::string &msg)
     LogInfo(msg.c_str());
 }
 
+EC_Placeable *Entity_get_placeable(Entity *e)
+{
+    return e->GetComponent<EC_Placeable>().get();
+}
+
+void RegisterSceneAPI(asIScriptEngine *engine)
+{
+    int r = engine->RegisterObjectMethod("Entity", "EC_Placeable@ get_placeable()", AS_FUNCTION_PR(Entity_get_placeable, (Entity*), EC_Placeable*), AS_CTOR_CONVENTION); assert(r >= 0);
+}
+
 void AngelscriptModule::CreateScriptEngine()
 {
     LogInfo("AngelscriptModule::CreateScriptEngine");
@@ -110,6 +120,7 @@ void AngelscriptModule::CreateScriptEngine()
     RegisterScriptArray(engine, true);
 
     RegisterAngelscriptObjects(engine);
+    RegisterSceneAPI(engine);
 
     context = engine->CreateContext();
     assert(context != 0);

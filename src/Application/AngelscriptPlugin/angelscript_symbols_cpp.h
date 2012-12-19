@@ -10,6 +10,7 @@
 #define AS_CTOR_CONVENTION asCALL_GENERIC
 #define AS_MEMBER_CALL_CONVENTION asCALL_GENERIC
 #define AS_FUNCTION WRAP_FN
+#define AS_FUNCTION_PR WRAP_FN_PR
 #define AS_CONSTRUCTOR(ctorFuncName, className, parameters) WRAP_CON(className, parameters)
 #define AS_DESTRUCTOR(className, dtorFunc) WRAP_DES(className)
 #define AS_METHOD_FUNCTION_PR WRAP_MFN_PR
@@ -20,6 +21,7 @@
 #define AS_CTOR_CONVENTION asCALL_CDECL_OBJLAST
 #define AS_MEMBER_CALL_CONVENTION asCALL_THISCALL
 #define AS_FUNCTION asFUNCTION
+#define AS_FUNCTION_PR asFUNCTIONPR
 #define AS_CONSTRUCTOR(ctorFuncName, className, parameters) asFUNCTION(ctorFuncName)
 #define AS_DESTRUCTOR(className, dtorFunc) asFUNCTION(dtorFunc)
 #define AS_METHOD_FUNCTION_PR asMETHODPR
@@ -526,9 +528,9 @@ static void LCG_ctor_u32_u32_u32_u32(u32 seed,u32 multiplier,u32 increment,u32 m
 	new(self) LCG(seed,multiplier,increment,modulus);
 }
 
-static void EC_Placeable_ctor_Scene_ptr(Scene * scene, EC_Placeable *self)
+static EC_Placeable *EC_Placeable_Factory_Scene_ptr(Scene * scene, EC_Placeable *self)
 {
-	new(self) EC_Placeable(scene);
+	return new EC_Placeable(scene);
 }
 
 static void EC_Placeable_dtor(void *memory)
@@ -568,7 +570,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectType("Triangle", sizeof(Triangle), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS | asOBJ_APP_CLASS_CONSTRUCTOR); assert(r >= 0);
 	r = engine->RegisterObjectType("Clock", sizeof(Clock), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS | asOBJ_APP_CLASS_CONSTRUCTOR); assert(r >= 0);
 	r = engine->RegisterObjectType("LCG", sizeof(LCG), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS | asOBJ_APP_CLASS_CONSTRUCTOR); assert(r >= 0);
-	r = engine->RegisterObjectType("EC_Placeable", sizeof(EC_Placeable), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS | asOBJ_APP_CLASS_CONSTRUCTOR | asOBJ_APP_CLASS_DESTRUCTOR); assert(r >= 0);
+	r = engine->RegisterObjectType("EC_Placeable", sizeof(EC_Placeable), asOBJ_REF | asOBJ_NOCOUNT); assert(r >= 0);
 
 
 // /*(char ** is not known to angelscript)*/ 	r = engine->RegisterObjectBehaviour("Framework", asBEHAVE_FACTORY, "Framework@ f(int,char **)", AS_FUNCTION(Framework_ctor_int_char_ptrptr, Framework, (int,char **)), AS_CALL_CONVENTION); assert(r >= 0);		r = engine->RegisterObjectMethod("Framework", "void Go()", AS_METHOD_FUNCTION_PR(Framework, Go, (), void), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
@@ -889,6 +891,8 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("float2", "bool IsPerpendicular(const float2 &in,float) const", AS_METHOD_FUNCTION_PR(float2, IsPerpendicular, (const float2 &,float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float2", "bool Equals(const float2 &in,float) const", AS_METHOD_FUNCTION_PR(float2, Equals, (const float2 &,float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float2", "bool Equals(float,float,float) const", AS_METHOD_FUNCTION_PR(float2, Equals, (float,float,float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("float2", "string ToString() const", AS_METHOD_FUNCTION_PR(float2, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("float2", "string SerializeToString() const", AS_METHOD_FUNCTION_PR(float2, SerializeToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float2", "float SumOfElements() const", AS_METHOD_FUNCTION_PR(float2, SumOfElements, () const, float), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float2", "float ProductOfElements() const", AS_METHOD_FUNCTION_PR(float2, ProductOfElements, () const, float), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float2", "float AverageOfElements() const", AS_METHOD_FUNCTION_PR(float2, AverageOfElements, () const, float), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
@@ -923,7 +927,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("float2", "float AngleBetweenNorm(const float2 &in) const", AS_METHOD_FUNCTION_PR(float2, AngleBetweenNorm, (const float2 &) const, float), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float2", "void Decompose(const float2 &in,float2 &out,float2 &out) const", AS_METHOD_FUNCTION_PR(float2, Decompose, (const float2 &,float2 &,float2 &) const, void), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float2", "float2 Lerp(const float2 &in,float) const", AS_METHOD_FUNCTION_PR(float2, Lerp, (const float2 &,float) const, float2), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
-	//.classmethod(// /*(const char * is not known to angelscript)*/ 	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(
+	//.classmethod(// /*(const char * is not known to angelscript)*/ 	//.classmethod(	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(float2 * is not known to angelscript)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(
 
 
 	r = engine->RegisterObjectProperty("float3", "float x", asOFFSET(float3, x)); assert(r >= 0);
@@ -1026,6 +1030,8 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("float3", "bool IsPerpendicular(const float3 &in,float) const", AS_METHOD_FUNCTION_PR(float3, IsPerpendicular, (const float3 &,float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3", "bool Equals(const float3 &in,float) const", AS_METHOD_FUNCTION_PR(float3, Equals, (const float3 &,float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3", "bool Equals(float,float,float,float) const", AS_METHOD_FUNCTION_PR(float3, Equals, (float,float,float,float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("float3", "string ToString() const", AS_METHOD_FUNCTION_PR(float3, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("float3", "string SerializeToString() const", AS_METHOD_FUNCTION_PR(float3, SerializeToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3", "float SumOfElements() const", AS_METHOD_FUNCTION_PR(float3, SumOfElements, () const, float), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3", "float ProductOfElements() const", AS_METHOD_FUNCTION_PR(float3, ProductOfElements, () const, float), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3", "float AverageOfElements() const", AS_METHOD_FUNCTION_PR(float3, AverageOfElements, () const, float), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
@@ -1067,7 +1073,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("float3", "float AngleBetweenNorm(const float3 &in) const", AS_METHOD_FUNCTION_PR(float3, AngleBetweenNorm, (const float3 &) const, float), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3", "void Decompose(const float3 &in,float3 &out,float3 &out) const", AS_METHOD_FUNCTION_PR(float3, Decompose, (const float3 &,float3 &,float3 &) const, void), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3", "float3 Lerp(const float3 &in,float) const", AS_METHOD_FUNCTION_PR(float3, Lerp, (const float3 &,float) const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
-	//.classmethod(	//.classmethod(	//.classmethod(// /*(const char * is not known to angelscript)*/ 	//.classmethod(	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(
+	//.classmethod(	//.classmethod(	//.classmethod(// /*(const char * is not known to angelscript)*/ 	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(
 
 
 	r = engine->RegisterObjectProperty("float4", "float x", asOFFSET(float4, x)); assert(r >= 0);
@@ -1139,6 +1145,8 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("float4", "float4 ScaledToLength3(float) const", AS_METHOD_FUNCTION_PR(float4, ScaledToLength3, (float) const, float4), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float4", "bool IsFinite() const", AS_METHOD_FUNCTION_PR(float4, IsFinite, () const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float4", "bool IsPerpendicular3(const float4 &in,float) const", AS_METHOD_FUNCTION_PR(float4, IsPerpendicular3, (const float4 &,float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("float4", "string ToString() const", AS_METHOD_FUNCTION_PR(float4, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("float4", "string SerializeToString() const", AS_METHOD_FUNCTION_PR(float4, SerializeToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float4", "float SumOfElements() const", AS_METHOD_FUNCTION_PR(float4, SumOfElements, () const, float), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float4", "float ProductOfElements() const", AS_METHOD_FUNCTION_PR(float4, ProductOfElements, () const, float), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float4", "float AverageOfElements() const", AS_METHOD_FUNCTION_PR(float4, AverageOfElements, () const, float), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
@@ -1178,7 +1186,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("float4", "float4 ProjectToNorm3(const float3 &in) const", AS_METHOD_FUNCTION_PR(float4, ProjectToNorm3, (const float3 &) const, float4), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float4", "bool Equals(const float4 &in,float) const", AS_METHOD_FUNCTION_PR(float4, Equals, (const float4 &,float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float4", "bool Equals(float,float,float,float,float) const", AS_METHOD_FUNCTION_PR(float4, Equals, (float,float,float,float,float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
-	//.classmethod(	//.classmethod(// /*(const char * is not known to angelscript)*/ 	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(
+	//.classmethod(	//.classmethod(// /*(const char * is not known to angelscript)*/ 	//.classmethod(	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(
 
 
 // /* Exposing array types as fields are not supported by angelscript. */ 	r = engine->RegisterObjectProperty("float3x3", "float v", asOFFSET(float3x3, v)); assert(r >= 0);
@@ -1279,6 +1287,8 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("float3x3", "bool IsColOrthogonal3(float) const", AS_METHOD_FUNCTION_PR(float3x3, IsColOrthogonal3, (float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3x3", "bool IsOrthonormal(float) const", AS_METHOD_FUNCTION_PR(float3x3, IsOrthonormal, (float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3x3", "bool Equals(const float3x3 &in,float) const", AS_METHOD_FUNCTION_PR(float3x3, Equals, (const float3x3 &,float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("float3x3", "string ToString() const", AS_METHOD_FUNCTION_PR(float3x3, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("float3x3", "string ToString2() const", AS_METHOD_FUNCTION_PR(float3x3, ToString2, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3x3", "float3 ToEulerXYX() const", AS_METHOD_FUNCTION_PR(float3x3, ToEulerXYX, () const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3x3", "float3 ToEulerXZX() const", AS_METHOD_FUNCTION_PR(float3x3, ToEulerXZX, () const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3x3", "float3 ToEulerYXY() const", AS_METHOD_FUNCTION_PR(float3x3, ToEulerYXY, () const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
@@ -1417,6 +1427,8 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("float3x4", "bool IsColOrthogonal3(float) const", AS_METHOD_FUNCTION_PR(float3x4, IsColOrthogonal3, (float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3x4", "bool IsOrthonormal(float) const", AS_METHOD_FUNCTION_PR(float3x4, IsOrthonormal, (float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3x4", "bool Equals(const float3x4 &in,float) const", AS_METHOD_FUNCTION_PR(float3x4, Equals, (const float3x4 &,float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("float3x4", "string ToString() const", AS_METHOD_FUNCTION_PR(float3x4, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("float3x4", "string ToString2() const", AS_METHOD_FUNCTION_PR(float3x4, ToString2, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3x4", "float3 ToEulerXYX() const", AS_METHOD_FUNCTION_PR(float3x4, ToEulerXYX, () const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3x4", "float3 ToEulerXZX() const", AS_METHOD_FUNCTION_PR(float3x4, ToEulerXZX, () const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float3x4", "float3 ToEulerYXY() const", AS_METHOD_FUNCTION_PR(float3x4, ToEulerYXY, () const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
@@ -1584,6 +1596,8 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("float4x4", "bool IsOrthonormal3(float) const", AS_METHOD_FUNCTION_PR(float4x4, IsOrthonormal3, (float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float4x4", "bool Equals(const float4x4 &in,float) const", AS_METHOD_FUNCTION_PR(float4x4, Equals, (const float4x4 &,float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float4x4", "bool ContainsProjection(float) const", AS_METHOD_FUNCTION_PR(float4x4, ContainsProjection, (float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("float4x4", "string ToString() const", AS_METHOD_FUNCTION_PR(float4x4, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("float4x4", "string ToString2() const", AS_METHOD_FUNCTION_PR(float4x4, ToString2, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float4x4", "float3 ToEulerXYX() const", AS_METHOD_FUNCTION_PR(float4x4, ToEulerXYX, () const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float4x4", "float3 ToEulerXZX() const", AS_METHOD_FUNCTION_PR(float4x4, ToEulerXZX, () const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("float4x4", "float3 ToEulerYXY() const", AS_METHOD_FUNCTION_PR(float4x4, ToEulerYXY, () const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
@@ -1674,6 +1688,10 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("Quat", "float3x3 ToFloat3x3() const", AS_METHOD_FUNCTION_PR(Quat, ToFloat3x3, () const, float3x3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Quat", "float3x4 ToFloat3x4() const", AS_METHOD_FUNCTION_PR(Quat, ToFloat3x4, () const, float3x4), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Quat", "float4x4 ToFloat4x4() const", AS_METHOD_FUNCTION_PR(Quat, ToFloat4x4, () const, float4x4), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("Quat", "string ToString() const", AS_METHOD_FUNCTION_PR(Quat, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("Quat", "string ToString2() const", AS_METHOD_FUNCTION_PR(Quat, ToString2, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("Quat", "string SerializeToString() const", AS_METHOD_FUNCTION_PR(Quat, SerializeToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("Quat", "string SerializeToStringWXYZ() const", AS_METHOD_FUNCTION_PR(Quat, SerializeToStringWXYZ, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Quat", "Quat opMul(const Quat &in) const", AS_METHOD_FUNCTION_PR(Quat, operator*, (const Quat &) const, Quat), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Quat", "float3 opMul(const float3 &in) const", AS_METHOD_FUNCTION_PR(Quat, operator*, (const float3 &) const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Quat", "Quat opDiv(const Quat &in) const", AS_METHOD_FUNCTION_PR(Quat, operator/, (const Quat &) const, Quat), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
@@ -1681,7 +1699,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("Quat", "Quat Mul(const float3x3 &in) const", AS_METHOD_FUNCTION_PR(Quat, Mul, (const float3x3 &) const, Quat), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Quat", "float3 Mul(const float3 &in) const", AS_METHOD_FUNCTION_PR(Quat, Mul, (const float3 &) const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Quat", "float4 Mul(const float4 &in) const", AS_METHOD_FUNCTION_PR(Quat, Mul, (const float4 &) const, float4), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
-	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(const char * is not known to angelscript)*/ 	//.classmethod(
+	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(const char * is not known to angelscript)*/ 	//.classmethod(	//.classmethod(
 
 
 	r = engine->RegisterObjectProperty("TranslateOp", "float x", asOFFSET(TranslateOp, x)); assert(r >= 0);
@@ -1809,6 +1827,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 // /*(const float3 * is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("AABB", "void Enclose(const float3 *,int)", AS_METHOD_FUNCTION_PR(AABB, Enclose, (const float3 *,int), void), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(float3 * is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("AABB", "void Triangulate(int,int,int,float3 *,float3 *,float2 *) const", AS_METHOD_FUNCTION_PR(AABB, Triangulate, (int,int,int,float3 *,float3 *,float2 *) const, void), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(float3 * is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("AABB", "void ToEdgeList(float3 *) const", AS_METHOD_FUNCTION_PR(AABB, ToEdgeList, (float3 *) const, void), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("AABB", "string ToString() const", AS_METHOD_FUNCTION_PR(AABB, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("AABB", "AABB Intersection(const AABB &in) const", AS_METHOD_FUNCTION_PR(AABB, Intersection, (const AABB &) const, AABB), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("AABB", "bool IntersectRayAABB(const float3 &in,const float3 &in,float &out,float &out) const", AS_METHOD_FUNCTION_PR(AABB, IntersectRayAABB, (const float3 &,const float3 &,float &,float &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(const float3 * is not known to angelscript)*/ 	//.classmethod(// /*(const float3 * is not known to angelscript)*/ 	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(
@@ -1874,6 +1893,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 // /*(Polygon is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("Capsule", "bool Intersects(const Polygon &in) const", AS_METHOD_FUNCTION_PR(Capsule, Intersects, (const Polygon &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Capsule", "bool Intersects(const Frustum &in) const", AS_METHOD_FUNCTION_PR(Capsule, Intersects, (const Frustum &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(Polyhedron is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("Capsule", "bool Intersects(const Polyhedron &in) const", AS_METHOD_FUNCTION_PR(Capsule, Intersects, (const Polyhedron &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("Capsule", "string ToString() const", AS_METHOD_FUNCTION_PR(Capsule, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 
 
 
@@ -1900,6 +1920,9 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("Circle", "bool IntersectsDisc(const Line &in) const", AS_METHOD_FUNCTION_PR(Circle, IntersectsDisc, (const Line &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Circle", "bool IntersectsDisc(const LineSegment &in) const", AS_METHOD_FUNCTION_PR(Circle, IntersectsDisc, (const LineSegment &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Circle", "bool IntersectsDisc(const Ray &in) const", AS_METHOD_FUNCTION_PR(Circle, IntersectsDisc, (const Ray &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+// /*(std::vector< float3 > is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("Circle", "std::vector< float3 > IntersectsFaces(const OBB &in) const", AS_METHOD_FUNCTION_PR(Circle, IntersectsFaces, (const OBB &) const, std::vector< float3 >), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+// /*(std::vector< float3 > is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("Circle", "std::vector< float3 > IntersectsFaces(const AABB &in) const", AS_METHOD_FUNCTION_PR(Circle, IntersectsFaces, (const AABB &) const, std::vector< float3 >), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("Circle", "string ToString() const", AS_METHOD_FUNCTION_PR(Circle, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 
 
 
@@ -1970,6 +1993,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("Frustum", "bool Intersects(const Capsule &in) const", AS_METHOD_FUNCTION_PR(Frustum, Intersects, (const Capsule &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Frustum", "bool Intersects(const Frustum &in) const", AS_METHOD_FUNCTION_PR(Frustum, Intersects, (const Frustum &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(Polyhedron is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("Frustum", "bool Intersects(const Polyhedron &in) const", AS_METHOD_FUNCTION_PR(Frustum, Intersects, (const Polyhedron &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("Frustum", "string ToString() const", AS_METHOD_FUNCTION_PR(Frustum, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(
 
 
@@ -2014,6 +2038,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("Line", "bool IntersectsDisc(const Circle &in) const", AS_METHOD_FUNCTION_PR(Line, IntersectsDisc, (const Circle &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Line", "Ray ToRay() const", AS_METHOD_FUNCTION_PR(Line, ToRay, () const, Ray), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Line", "LineSegment ToLineSegment(float) const", AS_METHOD_FUNCTION_PR(Line, ToLineSegment, (float) const, LineSegment), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("Line", "string ToString() const", AS_METHOD_FUNCTION_PR(Line, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	//.classmethod(// /*(float * is not known to angelscript)*/ 	//.classmethod(
 
 
@@ -2063,6 +2088,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("LineSegment", "bool IntersectsDisc(const Circle &in) const", AS_METHOD_FUNCTION_PR(LineSegment, IntersectsDisc, (const Circle &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("LineSegment", "Ray ToRay() const", AS_METHOD_FUNCTION_PR(LineSegment, ToRay, () const, Ray), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("LineSegment", "Line ToLine() const", AS_METHOD_FUNCTION_PR(LineSegment, ToLine, () const, Line), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("LineSegment", "string ToString() const", AS_METHOD_FUNCTION_PR(LineSegment, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 
 
 
@@ -2144,6 +2170,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("OBB", "void Enclose(const float3 &in)", AS_METHOD_FUNCTION_PR(OBB, Enclose, (const float3 &), void), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(float3 * is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("OBB", "void Triangulate(int,int,int,float3 *,float3 *,float2 *) const", AS_METHOD_FUNCTION_PR(OBB, Triangulate, (int,int,int,float3 *,float3 *,float2 *) const, void), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(float3 * is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("OBB", "void ToEdgeList(float3 *) const", AS_METHOD_FUNCTION_PR(OBB, ToEdgeList, (float3 *) const, void), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("OBB", "string ToString() const", AS_METHOD_FUNCTION_PR(OBB, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(const float3 * is not known to angelscript)*/ 	//.classmethod(// /*(const float3 * is not known to angelscript)*/ 	//.classmethod(	//.classmethod(	//.classmethod(
 
 
@@ -2223,6 +2250,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 // /*(inout refs are not supported for value types)*/ 	r = engine->RegisterObjectMethod("Plane", "int Clip(const Triangle &in,Triangle &,Triangle &) const", AS_METHOD_FUNCTION_PR(Plane, Clip, (const Triangle &,Triangle &,Triangle &) const, int), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Plane", "bool PassesThroughOrigin(float) const", AS_METHOD_FUNCTION_PR(Plane, PassesThroughOrigin, (float) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Plane", "Circle GenerateCircle(const float3 &in,float) const", AS_METHOD_FUNCTION_PR(Plane, GenerateCircle, (const float3 &,float) const, Circle), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("Plane", "string ToString() const", AS_METHOD_FUNCTION_PR(Plane, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 
 
 
@@ -2271,6 +2299,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 	r = engine->RegisterObjectMethod("Ray", "bool IntersectsDisc(const Circle &in) const", AS_METHOD_FUNCTION_PR(Ray, IntersectsDisc, (const Circle &) const, bool), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Ray", "Line ToLine() const", AS_METHOD_FUNCTION_PR(Ray, ToLine, () const, Line), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("Ray", "LineSegment ToLineSegment(float) const", AS_METHOD_FUNCTION_PR(Ray, ToLineSegment, (float) const, LineSegment), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("Ray", "string ToString() const", AS_METHOD_FUNCTION_PR(Ray, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 
 
 
@@ -2332,6 +2361,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 // /*(inout refs are not supported for value types)*/ 	r = engine->RegisterObjectMethod("Sphere", "float3 RandomPointInside(LCG &)", AS_METHOD_FUNCTION_PR(Sphere, RandomPointInside, (LCG &), float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(inout refs are not supported for value types)*/ 	r = engine->RegisterObjectMethod("Sphere", "float3 RandomPointOnSurface(LCG &)", AS_METHOD_FUNCTION_PR(Sphere, RandomPointOnSurface, (LCG &), float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(float3 * is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("Sphere", "int Triangulate(float3 *,float3 *,float2 *,int)", AS_METHOD_FUNCTION_PR(Sphere, Triangulate, (float3 *,float3 *,float2 *,int), int), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("Sphere", "string ToString() const", AS_METHOD_FUNCTION_PR(Sphere, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(const float3 * is not known to angelscript)*/ 	//.classmethod(// /*(const float3 * is not known to angelscript)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(// /*(inout refs are not supported for value types)*/ 	//.classmethod(
 
 
@@ -2391,6 +2421,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 // /*(inout refs are not supported for value types)*/ 	r = engine->RegisterObjectMethod("Triangle", "float3 RandomPointInside(LCG &) const", AS_METHOD_FUNCTION_PR(Triangle, RandomPointInside, (LCG &) const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(inout refs are not supported for value types)*/ 	r = engine->RegisterObjectMethod("Triangle", "float3 RandomVertex(LCG &) const", AS_METHOD_FUNCTION_PR(Triangle, RandomVertex, (LCG &) const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 // /*(inout refs are not supported for value types)*/ 	r = engine->RegisterObjectMethod("Triangle", "float3 RandomPointOnEdge(LCG &) const", AS_METHOD_FUNCTION_PR(Triangle, RandomPointOnEdge, (LCG &) const, float3), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+	r = engine->RegisterObjectMethod("Triangle", "string ToString() const", AS_METHOD_FUNCTION_PR(Triangle, ToString, () const, std::string), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(	//.classmethod(
 
 
@@ -2410,8 +2441,7 @@ void RegisterAngelscriptObjects(asIScriptEngine *engine)
 
 
 
-// /*(Scene * is not known to angelscript)*/ 	r = engine->RegisterObjectBehaviour("EC_Placeable", asBEHAVE_CONSTRUCT, "void f(Scene *)", AS_CONSTRUCTOR(EC_Placeable_ctor_Scene_ptr, EC_Placeable, (Scene *)), AS_CTOR_CONVENTION); assert(r >= 0);
-	r = engine->RegisterObjectBehaviour("EC_Placeable", asBEHAVE_DESTRUCT, "void f()", AS_DESTRUCTOR(EC_Placeable, EC_Placeable_dtor), AS_CTOR_CONVENTION); assert(r >= 0);// /*(Ogre::SceneNode * is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("EC_Placeable", "Ogre::SceneNode * GetSceneNode() const", AS_METHOD_FUNCTION_PR(EC_Placeable, GetSceneNode, () const, Ogre::SceneNode *), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
+// /*(Scene * is not known to angelscript)*/ 	r = engine->RegisterObjectBehaviour("EC_Placeable", asBEHAVE_FACTORY, "EC_Placeable@ f(Scene *)", AS_FUNCTION(EC_Placeable_ctor_Scene_ptr, EC_Placeable, (Scene *)), AS_CALL_CONVENTION); assert(r >= 0);	// /*(Ogre::SceneNode * is not known to angelscript)*/ 	r = engine->RegisterObjectMethod("EC_Placeable", "Ogre::SceneNode * GetSceneNode() const", AS_METHOD_FUNCTION_PR(EC_Placeable, GetSceneNode, () const, Ogre::SceneNode *), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("EC_Placeable", "void SetPosition(float,float,float)", AS_METHOD_FUNCTION_PR(EC_Placeable, SetPosition, (float,float,float), void), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("EC_Placeable", "void SetPosition(const float3 &in)", AS_METHOD_FUNCTION_PR(EC_Placeable, SetPosition, (const float3 &), void), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
 	r = engine->RegisterObjectMethod("EC_Placeable", "void SetOrientation(const Quat &in)", AS_METHOD_FUNCTION_PR(EC_Placeable, SetOrientation, (const Quat &), void), AS_MEMBER_CALL_CONVENTION); assert(r >= 0);
