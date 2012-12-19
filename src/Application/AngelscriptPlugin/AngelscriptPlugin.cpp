@@ -108,6 +108,38 @@ void RegisterSceneAPI(asIScriptEngine *engine)
     int r = engine->RegisterObjectMethod("Entity", "EC_Placeable@ get_placeable()", AS_FUNCTION_PR(Entity_get_placeable, (Entity*), EC_Placeable*), AS_CTOR_CONVENTION); assert(r >= 0);
 }
 
+// http://www.gamedev.net/topic/576960-using-boostshared_ptr-with-angelscript/
+template <typename Type>
+struct SharedPointerWrapper
+{
+    static void construct(void* memory)
+    {
+        new(memory) boost::shared_ptr<Type>();
+    }
+
+    static void destruct(void* memory)
+    {
+    ((boost::shared_ptr<Type>*)memory)->~shared_ptr();
+    }
+};
+template<typename Type>
+void RegisterSharedPointer(const std::string& ptrTypeName, const std::string& typeName, asIScriptEngine* engine)
+{
+    std::string getSignature;
+    getSignature.append(typeName).append("& get()");
+
+    int r;
+
+    r = engine->RegisterObjectType(ptrTypeName.c_str(), sizeof(boost::shared_ptr<Type>), asOBJ_VALUE | asOBJ_APP_CLASS_CDA); assert(r >= 0);
+
+    r = engine->RegisterObjectBehaviour(ptrTypeName.c_str(), asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(SharedPointerWrapper<Type>::construct), asCALL_CDECL_OBJLAST); assert(r >= 0);
+    r = engine->RegisterObjectBehaviour(ptrTypeName.c_str(), asBEHAVE_DESTRUCT, "void f()", asFUNCTION(SharedPointerWrapper<Type>::destruct), asCALL_CDECL_OBJLAST); assert(r >= 0);
+
+    r = engine->RegisterObjectMethod(ptrTypeName.c_str(), (ptrTypeName + "& opAssign(const " + ptrTypeName + " &in other)").c_str(), asMETHODPR(boost::shared_ptr<Type>, operator=, (boost::shared_ptr<Type> const &), boost::shared_ptr<Type>&), asCALL_THISCALL); assert(r >= 0);
+    r = engine->RegisterObjectMethod(ptrTypeName.c_str(), getSignature.c_str(), asMETHOD(boost::shared_ptr<Type>, get), asCALL_THISCALL); assert(r >= 0);
+}
+
+
 void AngelscriptModule::CreateScriptEngine()
 {
     LogInfo("AngelscriptModule::CreateScriptEngine");
