@@ -1062,6 +1062,12 @@ float4x4 &float4x4::operator =(const float4x4 &rhs)
 	return *this;
 }
 
+float4x4 &float4x4::operator =(const Quat &rhs)
+{
+    *this = rhs.ToFloat4x4();
+    return *this;
+}
+
 float float4x4::Determinant3() const
 {
 	assume(Float3x3Part().IsFinite());
