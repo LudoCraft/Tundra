@@ -48,6 +48,11 @@
 #include "Geometry/Triangle.h"
 #include "Entity.h"
 #include "aswrappedcall_17.h"
+
+template<typename Type>
+void RegisterSharedPointer(const std::string& ptrTypeName, const std::string& typeName, asIScriptEngine* engine);
+
+
 #include "angelscript_symbols_cpp.h"
 
 AngelscriptModule::AngelscriptModule()
