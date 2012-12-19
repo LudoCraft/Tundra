@@ -7,10 +7,13 @@
 #include "EC_RocketUiDocument.h"
 #include "IAssetTransfer.h"
 #include "IComponentFactory.h"
+#include "InputAPI.h"
+
 #include "LoggingFunctions.h"
 #include "LibRocketPlugin.h"
 #include "OgreRenderingModule.h"
 #include "OgreWorld.h"
+#include "Profiler.h"
 #include "Renderer.h"
 #include "RenderWindow.h"
 #include "RenderInterfaceOgre3D.h"
@@ -23,6 +26,7 @@
 #undef IN
 #endif
 #include <Rocket/Controls.h>
+#include <Rocket/Controls/ElementFormControlInput.h>
 #include <Rocket/Core.h>
 #include <Rocket/Core/ElementDocument.h>
 
@@ -32,6 +36,7 @@ LibRocketPlugin::LibRocketPlugin() :
     renderInterface(0),
     context(0)
 {
+    InitKeyCodeMap();
 }
 
 LibRocketPlugin::~LibRocketPlugin()
@@ -53,7 +58,7 @@ void LibRocketPlugin::Initialize()
     RenderWindow* rw = renderer->GetRenderWindow();
     if (!rw)
     {
-        LogError("LibRocketPlugin: framework is not headless, but no renderwindow object! Skippinginitialization.");
+        LogError("LibRocketPlugin: framework is not headless, but no renderwindow object! Skipping initialization.");
         return;
     }
     QObject::connect(rw, SIGNAL(Resized(int, int)), this, SLOT(OnRenderWindowResized(int, int)));
@@ -66,6 +71,11 @@ void LibRocketPlugin::Initialize()
     Rocket::Controls::Initialise();
     
     context = Rocket::Core::CreateContext(Rocket::Core::String("Tundra"), Rocket::Core::Vector2i(rw->Width(), rw->Height()), renderInterface);
+    if (!context)
+    {
+        LogError("LibRocketPlugin: Failed to create UI context");
+        return;
+    }
     
     // Add self to default dummy scenemanager for UI rendering
     Ogre::SceneManager* sm = renderer->GetDefaultSceneManager();
@@ -94,6 +104,12 @@ void LibRocketPlugin::Initialize()
     }
 #endif
     
+    inputContext = framework_->Input()->RegisterInputContext("RocketUi", 200);
+    inputContext->SetTakeMouseEventsOverQt(true);
+    inputContext->SetTakeKeyboardEventsOverQt(true);
+    QObject::connect(inputContext.get(), SIGNAL(MouseEventReceived(MouseEvent *)), this, SLOT(OnMouseEventReceived(MouseEvent *)));
+    QObject::connect(inputContext.get(), SIGNAL(KeyEventReceived(KeyEvent *)), this, SLOT(OnKeyEventReceived(KeyEvent *)));
+   
     framework_->RegisterDynamicObject("rocketui", this);
 }
 
@@ -157,11 +173,107 @@ void LibRocketPlugin::OnOgreWorldCreated(OgreWorld* world)
     world->OgreSceneManager()->addRenderQueueListener(this);
 }
 
-
 void LibRocketPlugin::Update(f64 timeStep)
 {
     if (context)
+    {
+        PROFILE(LibRocketPlugin_UpdateUi);
         context->Update();
+    }
+}
+
+void LibRocketPlugin::OnMouseEventReceived(MouseEvent* evt)
+{
+    switch (evt->eventType)
+    {
+    case MouseEvent::MouseMove:
+        context->ProcessMouseMove(evt->x, evt->y, GetQualifierFlags());
+        break;
+    case MouseEvent::MousePressed:
+        context->ProcessMouseButtonDown(ConvertMouseButton(evt->button), GetQualifierFlags());
+        break;
+    case MouseEvent::MouseReleased:
+        context->ProcessMouseButtonUp(ConvertMouseButton(evt->button), GetQualifierFlags());
+        break;
+    }
+    
+    /// \todo Suppress mouse events to the 3D scene underneath as necessary
+}
+
+void LibRocketPlugin::OnKeyEventReceived(KeyEvent* evt)
+{
+    int rocketKeyCode = -1;
+    std::map<int, int>::const_iterator i = keyCodeMap.find(evt->keyCode);
+    if (i != keyCodeMap.end())
+        rocketKeyCode = i->second;
+    
+    switch (evt->eventType)
+    {
+    case KeyEvent::KeyPressed:
+        if (rocketKeyCode >= 0)
+        {
+            //LogInfo("Keydown qt " + QString::number(evt->keyCode) + " rocket " + QString::number(rocketKeyCode));
+            context->ProcessKeyDown((Rocket::Core::Input::KeyIdentifier)rocketKeyCode, GetQualifierFlags());
+        }
+        //else
+        //    LogInfo("Keyup qt " + QString::number(evt->keyCode) + " rocket key unknown");
+        
+        if (evt->text.length())
+        {
+            for (int j = 0; j < evt->text.length(); ++j)
+            {
+                //LogInfo("Textinput " + QString::number(evt->text[j].unicode()));
+                context->ProcessTextInput(evt->text[j].unicode());
+            }
+        }
+        break;
+    case KeyEvent::KeyReleased:
+        if (rocketKeyCode >= 0)
+        {
+            //LogInfo("Keyup qt " + QString::number(evt->keyCode) + " rocket " + QString::number(rocketKeyCode));
+            context->ProcessKeyUp((Rocket::Core::Input::KeyIdentifier)rocketKeyCode, GetQualifierFlags());
+        }
+        //else
+        //    LogInfo("Keyup qt " + QString::number(evt->keyCode) + " rocket key unknown");
+        break;
+    }
+    
+    // Suppress the key event from going to Qt if an input element is focused
+    Rocket::Core::Element* el = context->GetFocusElement();
+    if (el && dynamic_cast<Rocket::Controls::ElementFormControlInput*>(el))
+        evt->Suppress();
+}
+
+int LibRocketPlugin::GetQualifierFlags()
+{
+    int flags = 0;
+    
+    if (inputContext->IsKeyDown(Qt::Key_Shift))
+        flags |= Rocket::Core::Input::KM_SHIFT;
+    if (inputContext->IsKeyDown(Qt::Key_Control))
+        flags |= Rocket::Core::Input::KM_CTRL;
+    if (inputContext->IsKeyDown(Qt::Key_Alt) || inputContext->IsKeyDown(Qt::Key_AltGr))
+        flags |= Rocket::Core::Input::KM_ALT;
+    if (inputContext->IsKeyDown(Qt::Key_NumLock))
+        flags |= Rocket::Core::Input::KM_NUMLOCK;
+    if (inputContext->IsKeyDown(Qt::Key_CapsLock))
+        flags |= Rocket::Core::Input::KM_CAPSLOCK;
+    
+    return flags;
+}
+
+int LibRocketPlugin::ConvertMouseButton(int button)
+{
+    int idx = 0;
+    while (button)
+    {
+        if (button & 1)
+            return idx;
+        ++idx;
+        button >>= 1;
+    }
+    
+    return -1;
 }
 
 /*
@@ -191,10 +303,117 @@ void LibRocketPlugin::Update(f64 timeStep)
  *
  */
 
+void LibRocketPlugin::InitKeyCodeMap()
+{
+    /// \todo Not all-encompassing
+    keyCodeMap[Qt::Key_A] = Rocket::Core::Input::KI_A;
+    keyCodeMap[Qt::Key_B] = Rocket::Core::Input::KI_B;
+    keyCodeMap[Qt::Key_C] = Rocket::Core::Input::KI_C;
+    keyCodeMap[Qt::Key_D] = Rocket::Core::Input::KI_D;
+    keyCodeMap[Qt::Key_E] = Rocket::Core::Input::KI_E;
+    keyCodeMap[Qt::Key_F] = Rocket::Core::Input::KI_F;
+    keyCodeMap[Qt::Key_G] = Rocket::Core::Input::KI_G;
+    keyCodeMap[Qt::Key_H] = Rocket::Core::Input::KI_H;
+    keyCodeMap[Qt::Key_I] = Rocket::Core::Input::KI_I;
+    keyCodeMap[Qt::Key_J] = Rocket::Core::Input::KI_J;
+    keyCodeMap[Qt::Key_K] = Rocket::Core::Input::KI_K;
+    keyCodeMap[Qt::Key_L] = Rocket::Core::Input::KI_L;
+    keyCodeMap[Qt::Key_M] = Rocket::Core::Input::KI_M;
+    keyCodeMap[Qt::Key_N] = Rocket::Core::Input::KI_N;
+    keyCodeMap[Qt::Key_O] = Rocket::Core::Input::KI_O;
+    keyCodeMap[Qt::Key_P] = Rocket::Core::Input::KI_P;
+    keyCodeMap[Qt::Key_Q] = Rocket::Core::Input::KI_Q;
+    keyCodeMap[Qt::Key_R] = Rocket::Core::Input::KI_R;
+    keyCodeMap[Qt::Key_S] = Rocket::Core::Input::KI_S;
+    keyCodeMap[Qt::Key_T] = Rocket::Core::Input::KI_T;
+    keyCodeMap[Qt::Key_U] = Rocket::Core::Input::KI_U;
+    keyCodeMap[Qt::Key_V] = Rocket::Core::Input::KI_V;
+    keyCodeMap[Qt::Key_W] = Rocket::Core::Input::KI_W;
+    keyCodeMap[Qt::Key_X] = Rocket::Core::Input::KI_X;
+    keyCodeMap[Qt::Key_Y] = Rocket::Core::Input::KI_Y;
+    keyCodeMap[Qt::Key_Z] = Rocket::Core::Input::KI_Z;
+
+    keyCodeMap[Qt::Key_0] = Rocket::Core::Input::KI_0;
+    keyCodeMap[Qt::Key_1] = Rocket::Core::Input::KI_1;
+    keyCodeMap[Qt::Key_2] = Rocket::Core::Input::KI_2;
+    keyCodeMap[Qt::Key_3] = Rocket::Core::Input::KI_3;
+    keyCodeMap[Qt::Key_4] = Rocket::Core::Input::KI_4;
+    keyCodeMap[Qt::Key_5] = Rocket::Core::Input::KI_5;
+    keyCodeMap[Qt::Key_6] = Rocket::Core::Input::KI_6;
+    keyCodeMap[Qt::Key_7] = Rocket::Core::Input::KI_7;
+    keyCodeMap[Qt::Key_8] = Rocket::Core::Input::KI_8;
+    keyCodeMap[Qt::Key_9] = Rocket::Core::Input::KI_9;
+
+    keyCodeMap[Qt::Key_Backspace] = Rocket::Core::Input::KI_BACK;
+    keyCodeMap[Qt::Key_Tab] = Rocket::Core::Input::KI_TAB;
+
+    keyCodeMap[Qt::Key_Clear] = Rocket::Core::Input::KI_CLEAR;
+    keyCodeMap[Qt::Key_Return] = Rocket::Core::Input::KI_RETURN;
+
+    keyCodeMap[Qt::Key_Pause] = Rocket::Core::Input::KI_PAUSE;
+    keyCodeMap[Qt::Key_CapsLock] = Rocket::Core::Input::KI_CAPITAL;
+
+    keyCodeMap[Qt::Key_Escape] = Rocket::Core::Input::KI_ESCAPE;
+
+    keyCodeMap[Qt::Key_Space] = Rocket::Core::Input::KI_SPACE;
+    keyCodeMap[Qt::Key_End] = Rocket::Core::Input::KI_END;
+    keyCodeMap[Qt::Key_Home] = Rocket::Core::Input::KI_HOME;
+    keyCodeMap[Qt::Key_Left] = Rocket::Core::Input::KI_LEFT;
+    keyCodeMap[Qt::Key_Up] = Rocket::Core::Input::KI_UP;
+    keyCodeMap[Qt::Key_Right] = Rocket::Core::Input::KI_RIGHT;
+    keyCodeMap[Qt::Key_Left] = Rocket::Core::Input::KI_DOWN;
+    keyCodeMap[Qt::Key_Select] = Rocket::Core::Input::KI_SELECT;
+    keyCodeMap[Qt::Key_Execute] = Rocket::Core::Input::KI_EXECUTE;
+    keyCodeMap[Qt::Key_Print] = Rocket::Core::Input::KI_SNAPSHOT;
+    keyCodeMap[Qt::Key_Insert] = Rocket::Core::Input::KI_INSERT;
+    keyCodeMap[Qt::Key_Delete] = Rocket::Core::Input::KI_DELETE;
+    keyCodeMap[Qt::Key_Help] = Rocket::Core::Input::KI_HELP;
+
+    keyCodeMap[Qt::Key_Sleep] = Rocket::Core::Input::KI_SLEEP;
+
+    keyCodeMap[Qt::Key_F1] = Rocket::Core::Input::KI_F1;
+    keyCodeMap[Qt::Key_F2] = Rocket::Core::Input::KI_F2;
+    keyCodeMap[Qt::Key_F3] = Rocket::Core::Input::KI_F3;
+    keyCodeMap[Qt::Key_F4] = Rocket::Core::Input::KI_F4;
+    keyCodeMap[Qt::Key_F5] = Rocket::Core::Input::KI_F5;
+    keyCodeMap[Qt::Key_F6] = Rocket::Core::Input::KI_F6;
+    keyCodeMap[Qt::Key_F7] = Rocket::Core::Input::KI_F7;
+    keyCodeMap[Qt::Key_F8] = Rocket::Core::Input::KI_F8;
+    keyCodeMap[Qt::Key_F9] = Rocket::Core::Input::KI_F9;
+    keyCodeMap[Qt::Key_F10] = Rocket::Core::Input::KI_F10;
+    keyCodeMap[Qt::Key_F11] = Rocket::Core::Input::KI_F11;
+    keyCodeMap[Qt::Key_F12] = Rocket::Core::Input::KI_F12;
+    keyCodeMap[Qt::Key_F13] = Rocket::Core::Input::KI_F13;
+    keyCodeMap[Qt::Key_F14] = Rocket::Core::Input::KI_F14;
+    keyCodeMap[Qt::Key_F15] = Rocket::Core::Input::KI_F15;
+    keyCodeMap[Qt::Key_F16] = Rocket::Core::Input::KI_F16;
+    keyCodeMap[Qt::Key_F17] = Rocket::Core::Input::KI_F17;
+    keyCodeMap[Qt::Key_F18] = Rocket::Core::Input::KI_F18;
+    keyCodeMap[Qt::Key_F19] = Rocket::Core::Input::KI_F19;
+    keyCodeMap[Qt::Key_F20] = Rocket::Core::Input::KI_F20;
+    keyCodeMap[Qt::Key_F21] = Rocket::Core::Input::KI_F21;
+    keyCodeMap[Qt::Key_F22] = Rocket::Core::Input::KI_F22;
+    keyCodeMap[Qt::Key_F23] = Rocket::Core::Input::KI_F23;
+    keyCodeMap[Qt::Key_F24] = Rocket::Core::Input::KI_F24;
+
+    keyCodeMap[Qt::Key_NumLock] = Rocket::Core::Input::KI_NUMLOCK;
+    keyCodeMap[Qt::Key_ScrollLock] = Rocket::Core::Input::KI_SCROLL;
+
+    keyCodeMap[Qt::Key_Shift] = Rocket::Core::Input::KI_LSHIFT;
+    keyCodeMap[Qt::Key_Control] = Rocket::Core::Input::KI_LCONTROL;
+    keyCodeMap[Qt::Key_Alt] = Rocket::Core::Input::KI_LMENU;
+
+    keyCodeMap[Qt::Key_Plus] = Rocket::Core::Input::KI_OEM_PLUS;
+    keyCodeMap[Qt::Key_Minus] = Rocket::Core::Input::KI_OEM_MINUS;
+    keyCodeMap[Qt::Key_Comma] = Rocket::Core::Input::KI_OEM_COMMA;
+    keyCodeMap[Qt::Key_Period] = Rocket::Core::Input::KI_OEM_PERIOD;
+}
+
 void LibRocketPlugin::renderQueueStarted(unsigned char queueGroupId, const Ogre::String& invocation, bool& skipThisInvocation)
 {
     if (context && queueGroupId == Ogre::RENDER_QUEUE_OVERLAY && Ogre::Root::getSingleton().getRenderSystem()->_getViewport()->getOverlaysEnabled())
     {
+        PROFILE(LibRocketPlugin_RenderUi);
         ConfigureRenderSystem();
         context->Render();
     }
