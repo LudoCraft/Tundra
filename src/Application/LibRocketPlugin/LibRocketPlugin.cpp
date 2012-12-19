@@ -189,15 +189,25 @@ void LibRocketPlugin::OnMouseEventReceived(MouseEvent* evt)
     case MouseEvent::MouseMove:
         context->ProcessMouseMove(evt->x, evt->y, GetQualifierFlags());
         break;
+        
     case MouseEvent::MousePressed:
         context->ProcessMouseButtonDown(ConvertMouseButton(evt->button), GetQualifierFlags());
         break;
+        
     case MouseEvent::MouseReleased:
         context->ProcessMouseButtonUp(ConvertMouseButton(evt->button), GetQualifierFlags());
-        break;
+        return; // Never suppress release
     }
     
-    /// \todo Suppress mouse events to the 3D scene underneath as necessary
+    // If we're hovering at an UI element with the mouse cursor visible, suppress event.
+    /// \todo Is coarse. Do per-pixel check for transparencies if possible
+    if (framework_->Input()->IsMouseCursorVisible())
+    {
+        Rocket::Core::Element* hover = context->GetHoverElement();
+        // Root element (which encompasses entire screen) does not belong in a document, disregard
+        if (hover && hover->GetOwnerDocument())
+            evt->Suppress();
+    }
 }
 
 void LibRocketPlugin::OnKeyEventReceived(KeyEvent* evt)
@@ -226,7 +236,15 @@ void LibRocketPlugin::OnKeyEventReceived(KeyEvent* evt)
                 context->ProcessTextInput(evt->text[j].unicode());
             }
         }
+        
+        // Suppress the key event from going to Qt if an input element is focused
+        {
+            Rocket::Core::Element* focus = context->GetFocusElement();
+            if (focus && dynamic_cast<Rocket::Controls::ElementFormControlInput*>(focus))
+                evt->Suppress();
+        }
         break;
+        
     case KeyEvent::KeyReleased:
         if (rocketKeyCode >= 0)
         {
@@ -238,10 +256,7 @@ void LibRocketPlugin::OnKeyEventReceived(KeyEvent* evt)
         break;
     }
     
-    // Suppress the key event from going to Qt if an input element is focused
-    Rocket::Core::Element* el = context->GetFocusElement();
-    if (el && dynamic_cast<Rocket::Controls::ElementFormControlInput*>(el))
-        evt->Suppress();
+
 }
 
 int LibRocketPlugin::GetQualifierFlags()
