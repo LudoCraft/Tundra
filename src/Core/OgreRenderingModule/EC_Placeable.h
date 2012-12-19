@@ -83,8 +83,8 @@
     </table> */
 class OGRE_MODULE_API EC_Placeable : public IComponent
 {
-    Q_OBJECT
-    COMPONENT_NAME("EC_Placeable", 20)
+    Q_OBJECT;
+    COMPONENT_NAME("EC_Placeable", 20);
 
 public:
     /// Do not directly allocate new components using operator new, but use the factory-based SceneAPI::CreateComponent functions instead.
@@ -104,17 +104,17 @@ public:
     DEFINE_QPROPERTY_ATTRIBUTE(bool, visible);
 
     /// Specifies the selection layer of this object. This can be used to selectively perform raycasts.
-    Q_PROPERTY(int selectionLayer READ getselectionLayer WRITE setselectionLayer)
+    Q_PROPERTY(int selectionLayer READ getselectionLayer WRITE setselectionLayer);
     DEFINE_QPROPERTY_ATTRIBUTE(int, selectionLayer);
 
     /// Specifies the parent entity of this entity. Set to 0 for no parenting.
-    Q_PROPERTY(EntityReference parentRef READ getparentRef WRITE setparentRef)
+    Q_PROPERTY(EntityReference parentRef READ getparentRef WRITE setparentRef);
     DEFINE_QPROPERTY_ATTRIBUTE(EntityReference, parentRef);
 
     /// Specifies the name of the bone on the parent entity.
     /** Needs that the parent entity has a skeletal mesh.
         Set to empty for no parent bone assignment, in which case this scene node is attached to the root of the parent node. */
-    Q_PROPERTY(QString parentBone READ getparentBone WRITE setparentBone)
+    Q_PROPERTY(QString parentBone READ getparentBone WRITE setparentBone);
     DEFINE_QPROPERTY_ATTRIBUTE(QString, parentBone);
 
     /// Returns the Ogre scene node for attaching geometry.

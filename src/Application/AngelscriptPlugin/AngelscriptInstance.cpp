@@ -12,8 +12,8 @@ AngelscriptInstance::AngelscriptInstance(const QString &fileName, AngelscriptMod
     LogInfo("AngelscriptInstance ctor");
 }
 */
-AngelscriptInstance::AngelscriptInstance(ScriptAssetPtr scriptRef, AngelscriptModule *module_)
-:module(module_)
+AngelscriptInstance::AngelscriptInstance(Entity *me_, ScriptAssetPtr scriptRef, AngelscriptModule *module_)
+:module(module_), me(me_)
 {
     LogInfo("AngelscriptInstance ctor");
 
@@ -79,7 +79,7 @@ void AngelscriptInstance::Run()
         return;
     }
 
-    asIScriptFunction *function = scriptModule->GetFunctionByDecl("void main()");
+    asIScriptFunction *function = scriptModule->GetFunctionByDecl("void main(Entity @me)");
     if (function == 0)
     {
         LogError("Angelscript Module '" + scriptModuleName + "' does not contain an entry point function 'void main()', cannot run script!");
@@ -87,6 +87,7 @@ void AngelscriptInstance::Run()
     }
 
     module->Context()->Prepare(function);
+    module->Context()->SetArgObject(0, me);
     int r = module->Context()->Execute();
     if (r == asEXECUTION_EXCEPTION)
     {

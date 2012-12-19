@@ -24,14 +24,14 @@ QT4_WRAP_CPP(MOC_SRCS ${MOC_FILES})
 QT4_WRAP_UI(UI_SRCS ${UI_FILES})
 
 UseTundraCore()
-use_core_modules(TundraCore Math)
+use_core_modules(TundraCore Math OgreRenderingModule)
 use_app_modules(JavascriptModule)
 
 build_library (${TARGET_NAME} SHARED ${SOURCE_FILES} ${MOC_SRCS} ${UI_SRCS})
 
 link_package(QT4)
 link_ogre()
-link_modules(TundraCore Math JavascriptModule)
+link_modules(TundraCore Math JavascriptModule OgreRenderingModule)
 link_entity_components(EC_Script)
 
 target_link_libraries(${TARGET_NAME} Angelscript)

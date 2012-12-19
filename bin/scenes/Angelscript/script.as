@@ -1,4 +1,4 @@
-void main()
+void main(Entity @me)
 {
     print("Hello, world!");
 }

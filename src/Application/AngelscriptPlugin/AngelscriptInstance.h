@@ -21,7 +21,7 @@ public:
     /// Creates script engine for this script instance and loads the script but doesn't run it yet.
     /** @param scriptRef Script asset reference.
         @param module Javascript module. */
-    AngelscriptInstance(ScriptAssetPtr scriptRef, AngelscriptModule *module);
+    AngelscriptInstance(Entity *me, ScriptAssetPtr scriptRef, AngelscriptModule *module);
 
     /// Creates script engine for this script instance and loads the script but doesn't run it yet.
     /** @param scriptRefs Script asset references.
@@ -55,4 +55,6 @@ private:
 
     /// Filenames can contain Unicode.
     QString scriptFilename;
+
+    Entity *me;
 };

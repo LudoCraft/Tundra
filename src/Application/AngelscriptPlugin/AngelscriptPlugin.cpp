@@ -24,6 +24,7 @@
 #include <scriptarray/scriptarray.cpp>
 #include "LoggingFunctions.h"
 
+#include "EC_Placeable.h"
 #include "Math/float2.h"
 #include "Math/float3.h"
 #include "Math/float4.h"
@@ -108,6 +109,8 @@ void AngelscriptModule::CreateScriptEngine()
 
     RegisterScriptArray(engine, true);
 
+    RegisterAngelscriptObjects(engine);
+
     context = engine->CreateContext();
     assert(context != 0);
 }
@@ -149,7 +152,7 @@ void AngelscriptModule::OnScriptAssetsChanged(const std::vector<ScriptAssetPtr>&
         {
             if (!scriptInstance)
             {
-                scriptInstance = new AngelscriptInstance(script, this);
+                scriptInstance = new AngelscriptInstance(sender->ParentEntity(), script, this);
             }
         }
     }
