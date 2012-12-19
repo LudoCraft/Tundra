@@ -1,0 +1,1 @@
+angelscriptgenerator ../../../doc/xml Framework SceneAPI Scene Entity IComponent IAttribute float2 float3 float4 float3x3 float3x4 float4x4 Quat TranslateOp ScaleOp AABB Capsule Circle Frustum Line LineSegment OBB Plane Ray Sphere Triangle Clock LCG EC_Placeable Transform EntityPtr ScenePtr
