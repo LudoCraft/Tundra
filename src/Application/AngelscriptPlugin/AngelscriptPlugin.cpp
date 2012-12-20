@@ -207,7 +207,7 @@ void AngelscriptModule::OnScriptAssetsChanged(const std::vector<ScriptAssetPtr>&
         }
     }
 
-    if (sender->runOnLoad.Get() && sender->ShouldRun())
+    if (scriptInstance && sender->runOnLoad.Get() && sender->ShouldRun())
     {
         bool isApplication = !sender->applicationName.Get().trimmed().isEmpty();
         if (isApplication && framework_->HasCommandLineParameter("--disablerunonload"))
