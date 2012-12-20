@@ -191,7 +191,8 @@ void AngelscriptModule::OnScriptAssetsChanged(const std::vector<ScriptAssetPtr>&
         return;
     }
 
-    IScriptInstance *scriptInstance = sender->ScriptInstance();
+    sender->SetScriptInstance(0); // Delete old script instance.
+    IScriptInstance *scriptInstance = 0; // Never reuse the script instance, but always allocate a new one for now. // sender->ScriptInstance();
 
     ///\todo Add support for multiple angelscript scripts.
     Q_FOREACH(ScriptAssetPtr script, newScripts)
@@ -201,6 +202,7 @@ void AngelscriptModule::OnScriptAssetsChanged(const std::vector<ScriptAssetPtr>&
             if (!scriptInstance)
             {
                 scriptInstance = new AngelscriptInstance(sender->ParentEntity(), script, this);
+                sender->SetScriptInstance(scriptInstance);
             }
         }
     }

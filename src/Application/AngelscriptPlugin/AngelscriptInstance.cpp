@@ -2,6 +2,8 @@
 #include "AngelscriptPlugin.h"
 #include "LoggingFunctions.h"
 #include "ScriptAsset.h"
+#include "FrameAPI.h"
+#include "Framework.h"
 
 #include <angelscript.h>
 #include <scriptbuilder/scriptbuilder.h>
@@ -12,13 +14,16 @@ AngelscriptInstance::AngelscriptInstance(const QString &fileName, AngelscriptMod
     LogInfo("AngelscriptInstance ctor");
 }
 */
+
+static int uniqueCounter = 1; ///\todo Remove this and provide 
+
 AngelscriptInstance::AngelscriptInstance(Entity *me_, ScriptAssetPtr scriptRef, AngelscriptModule *module_)
-:module(module_), me(me_)
+:module(module_), me(me_), scriptModule(0), updateFunction(0)
 {
     LogInfo("AngelscriptInstance ctor");
 
 //    scriptAsset = scriptRef;
-    scriptModuleName = scriptRef->Name().toStdString();
+    scriptModuleName = (scriptRef->Name() + "_" + QString(uniqueCounter++)).toStdString();
     scriptFilename = scriptRef->DiskSource();
 
     Load();
@@ -59,6 +64,8 @@ void AngelscriptInstance::Load()
     {
         LogError("Angelscript BuildModule failed. Please correct the errors in the script and try again.");
     }
+    scriptModule = 0;
+    updateFunction = 0;
 }
 
 void AngelscriptInstance::Unload()
@@ -66,13 +73,17 @@ void AngelscriptInstance::Unload()
     LogInfo("AngelscriptInstance::Unload");
 
     module->Engine()->DiscardModule(scriptModuleName.c_str());
+    scriptModule = 0;
+    updateFunction = 0;
+
+    disconnect(module->GetFramework()->Frame(), SIGNAL(Updated(float)), this, SLOT(OnFrameUpdate(float)));
 }
 
 void AngelscriptInstance::Run()
 {
     LogInfo("AngelscriptInstance::Run");
 
-    asIScriptModule *scriptModule = module->Engine()->GetModule(scriptModuleName.c_str());
+    scriptModule = module->Engine()->GetModule(scriptModuleName.c_str());
     if (!scriptModule)
     {
         LogError("Angelscript Module '" + scriptModuleName + "' not loaded, cannot run script!");
@@ -93,6 +104,25 @@ void AngelscriptInstance::Run()
     {
         LogError(QString("An exception '") + module->Context()->GetExceptionString() + "' occurred. Please correct the code and try again.");
         return;
+    }
+
+    updateFunction = scriptModule->GetFunctionByDecl("void update(float dt)");
+
+    connect(module->GetFramework()->Frame(), SIGNAL(Updated(float)), this, SLOT(OnFrameUpdate(float)), Qt::UniqueConnection);
+}
+
+void AngelscriptInstance::OnFrameUpdate(float dt)
+{
+    if (updateFunction && module && module->Context())
+    {
+        module->Context()->Prepare(updateFunction);
+        module->Context()->SetArgFloat(0, dt);
+        int r = module->Context()->Execute();
+        if (r == asEXECUTION_EXCEPTION)
+        {
+            LogError(QString("An exception '") + module->Context()->GetExceptionString() + "' occurred. Please correct the code and try again.");
+            return;
+        }
     }
 }
 

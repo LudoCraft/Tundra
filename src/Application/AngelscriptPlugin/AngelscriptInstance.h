@@ -6,6 +6,8 @@
 #include "JavascriptFwd.h"
 
 class AngelscriptModule;
+class asIScriptModule;
+class asIScriptFunction;
 
 /// Angelscript script instance used wit EC_Script.
 class AngelscriptInstance : public IScriptInstance
@@ -46,9 +48,15 @@ public:
 public slots:
     virtual QMap<QString, uint> DumpEngineInformation() { return QMap<QString, uint>(); }
 
+private slots:
+    void OnFrameUpdate(float dt);
+
 private:
     AngelscriptModule *module;
     //boost::weak_ptr<ScriptAsset> scriptAsset;
+
+    asIScriptModule *scriptModule;
+    asIScriptFunction *updateFunction;
 
     /// Script module names are ASCII in Angelscript.
     std::string scriptModuleName;
