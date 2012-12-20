@@ -221,19 +221,16 @@ void LibRocketPlugin::OnKeyEventReceived(KeyEvent* evt)
     {
     case KeyEvent::KeyPressed:
         if (rocketKeyCode >= 0)
-        {
-            //LogInfo("Keydown qt " + QString::number(evt->keyCode) + " rocket " + QString::number(rocketKeyCode));
             context->ProcessKeyDown((Rocket::Core::Input::KeyIdentifier)rocketKeyCode, GetQualifierFlags());
-        }
-        //else
-        //    LogInfo("Keyup qt " + QString::number(evt->keyCode) + " rocket key unknown");
         
         if (evt->text.length())
         {
             for (int j = 0; j < evt->text.length(); ++j)
             {
-                //LogInfo("Textinput " + QString::number(evt->text[j].unicode()));
-                context->ProcessTextInput(evt->text[j].unicode());
+                int unicode = evt->text[j].unicode();
+                // Do not send control characters as text input, except tab
+                if (unicode >= 32 || unicode == '\t')
+                    context->ProcessTextInput(unicode);
             }
         }
         
@@ -247,12 +244,7 @@ void LibRocketPlugin::OnKeyEventReceived(KeyEvent* evt)
         
     case KeyEvent::KeyReleased:
         if (rocketKeyCode >= 0)
-        {
-            //LogInfo("Keyup qt " + QString::number(evt->keyCode) + " rocket " + QString::number(rocketKeyCode));
             context->ProcessKeyUp((Rocket::Core::Input::KeyIdentifier)rocketKeyCode, GetQualifierFlags());
-        }
-        //else
-        //    LogInfo("Keyup qt " + QString::number(evt->keyCode) + " rocket key unknown");
         break;
     }
     
