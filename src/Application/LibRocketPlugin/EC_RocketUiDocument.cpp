@@ -13,6 +13,7 @@
 #endif
 #include <Rocket/Core.h>
 #include <Rocket/Core/ElementDocument.h>
+#include <Rocket/Controls/ElementFormControlInput.h>
 
 EC_RocketUiDocument::EC_RocketUiDocument(Scene* scene) :
     IComponent(scene),
@@ -46,6 +47,67 @@ void EC_RocketUiDocument::AttributesChanged()
     }
 }
 
+void EC_RocketUiDocument::SetElementPosition(const QString& id, const QPoint& newPos)
+{
+    if (document)
+    {
+        Rocket::Core::Element* element = document->GetElementById(Rocket::Core::String(id.toStdString().c_str()));
+        if (element)
+            element->SetOffset(Rocket::Core::Vector2f((float)newPos.x(), (float)newPos.y()), element->GetOffsetParent());
+        else
+            LogWarning("Element " + id + " not found for SetElementPosition");
+    }
+}
+
+void EC_RocketUiDocument::SetElementSize(const QString& id, const QPoint& newSize)
+{
+    if (document)
+    {
+        Rocket::Core::Element* element = document->GetElementById(Rocket::Core::String(id.toStdString().c_str()));
+        if (element)
+        {
+            /// \todo Works reliably only when element has 1 geometry box
+            Rocket::Core::Box box = element->GetBox();
+            box.SetContent(Rocket::Core::Vector2f((float)newSize.x(), (float)newSize.y()));
+            element->SetBox(box);
+        }
+        else
+            LogWarning("Element " + id + " not found for SetElementSize");
+    }
+}
+
+QPoint EC_RocketUiDocument::GetElementPosition(const QString& id)
+{
+    if (document)
+    {
+        Rocket::Core::Element* element = document->GetElementById(Rocket::Core::String(id.toStdString().c_str()));
+        if (element)
+        {
+            const Rocket::Core::Vector2f& pos = element->GetRelativeOffset();
+            return QPoint((int)pos.x, (int)pos.y);
+        }
+    }
+    
+    LogWarning("Element " + id + " not found for GetElementPosition");
+    return QPoint(0,0);
+}
+
+QPoint EC_RocketUiDocument::GetElementSize(const QString& id)
+{
+    if (document)
+    {
+        Rocket::Core::Element* element = document->GetElementById(Rocket::Core::String(id.toStdString().c_str()));
+        if (element)
+        {
+            const Rocket::Core::Box& box = element->GetBox();
+            return QPoint(box.GetSize().x, box.GetSize().y);
+        }
+    }
+    
+    LogWarning("Element " + id + " not found for GetElementSize");
+    return QPoint(0,0);
+}
+
 void EC_RocketUiDocument::OnDocumentAssetLoaded(AssetPtr asset)
 {
     // Remove old document if any
@@ -72,8 +134,13 @@ void EC_RocketUiDocument::OnDocumentAssetLoaded(AssetPtr asset)
         return;
     }
     
+    // Add event listeners
+    ProcessElementRecursive(document);
+    
     if (visible.Get())
         document->Show();
+    
+    emit DocumentChanged();
 }
 
 void EC_RocketUiDocument::RemoveDocument()
@@ -96,4 +163,27 @@ Rocket::Core::Context* EC_RocketUiDocument::GetContext()
     return module ? module->GetContext() : 0;
 }
 
+void EC_RocketUiDocument::ProcessElementRecursive(Rocket::Core::Element* element)
+{
+    if (!element)
+        return;
+    
+    /// \todo Adding event listeners causes iterator crash at exit; possibly need to be removed manually
+    //Rocket::Controls::ElementFormControlInput* inputElem = dynamic_cast<Rocket::Controls::ElementFormControlInput*>(element);
+    //if (inputElem)
+    //    inputElem->AddEventListener("change", this);
+    
+    int numChildren = element->GetNumChildren();
+    for (int i = 0; i < numChildren; ++i)
+        ProcessElementRecursive(element->GetChild(i));
+}
+
+void EC_RocketUiDocument::ProcessEvent(Rocket::Core::Event& event)
+{
+    Rocket::Core::Element* sender = event.GetCurrentElement();
+    if (!sender)
+        return;
+    
+    //LogInfo("Rocket event received: " + QString(event.GetType().CString()) + " from element id " + QString(sender->GetId().CString()) + " tagname " + QString(sender->GetTagName().CString()));
+}
 

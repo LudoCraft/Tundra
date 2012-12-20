@@ -7,11 +7,15 @@
 #include "AssetFwd.h"
 #include "AssetReference.h"
 
+#include <Rocket/Core/EventListener.h>
+#include <QPoint>
+
 namespace Rocket
 {
     namespace Core
     {
         class Context;
+        class Element;
         class ElementDocument;
     }
 }
@@ -42,7 +46,7 @@ namespace Rocket
 
     Does not emit any actions.
     </table> */
-class LIBROCKETPLUGIN_API EC_RocketUiDocument : public IComponent
+class LIBROCKETPLUGIN_API EC_RocketUiDocument : public IComponent, public Rocket::Core::EventListener
 {
     Q_OBJECT
     COMPONENT_NAME("EC_RocketUiDocument", 54)
@@ -63,6 +67,23 @@ public:
     /// Return the Rocket UI document.
     Rocket::Core::ElementDocument* GetDocument() { return document; }
     
+    /// Handle Rocket event.
+    virtual void ProcessEvent(Rocket::Core::Event& event);
+
+public slots:
+    /// Set the position of an element within the document
+    void SetElementPosition(const QString& id, const QPoint& newPos);
+    /// Set the size of an element within the document
+    void SetElementSize(const QString& id, const QPoint& newSize);
+    /// Return the position of an element within the document
+    QPoint GetElementPosition(const QString& id);
+    /// Return the size of an element within the document
+    QPoint GetElementSize(const QString& id);
+    
+signals:
+    /// Signaled when the UI document has been created
+    void DocumentChanged();
+    
 private slots:
     /// Called when document asset has been downloaded.
     void OnDocumentAssetLoaded(AssetPtr asset);
@@ -74,6 +95,8 @@ private:
     void RemoveDocument();
     /// Get the Rocket UI context from the LibRocket module.
     Rocket::Core::Context* GetContext();
+    /// Go through the elements in the document recursively and subscribe to applicable events.
+    void ProcessElementRecursive(Rocket::Core::Element* element);
     
     /// Instantiated UI document.
     Rocket::Core::ElementDocument* document;
