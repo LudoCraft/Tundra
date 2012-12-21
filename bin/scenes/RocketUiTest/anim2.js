@@ -16,12 +16,12 @@ function StartAnimation()
 
 function OnFrameUpdate()
 {
-    for (var i = 0; i < 8; ++i)
+    for (var i = 0; i < 10; ++i)
     {
         var elemName = "div" + (i+1);
 
         var oldPos = me.rocketuidocument.GetElementPosition(elemName);
-        var y = ((Math.sin(frame.WallClockTime() + i*0.25)*0.5)+0.5) * 500;
+        var y = ((Math.sin(frame.WallClockTime() + i*0.25)*0.5)+0.5) * 500 + 200;
         me.rocketuidocument.SetElementPosition(elemName, new QPoint(oldPos.x(), y));
     }
 }

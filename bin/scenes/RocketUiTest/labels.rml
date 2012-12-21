@@ -8,7 +8,7 @@
             	font-weight: normal;
             	font-style: normal;
             	font-size: 15;
-            	color: white;
+            	color: black;
 				margin: auto;
 			}
 
@@ -20,35 +20,41 @@
             	font-size: 18;
             	text-align: center;
             	tab-index: auto;
-                background-color: #ff8800;
+                background-color: #aaaaaa;
 			}
 
 		</style>
 	</head>
 	<body>
 		<div id="div1">
-            Element 1
+            Moving text!
 		</div>
 		<div id="div2">
-            Element 2
+            Moving text!
 		</div>
 		<div id="div3">
-            Element 3
+            Moving text!
 		</div>
 		<div id="div4">
-            Element 4
+            Moving text!
 		</div>
 		<div id="div5">
-            Element 5
+            Moving text!
 		</div>
 		<div id="div6">
-            Element 6
+            Moving text!
 		</div>
 		<div id="div7">
-            Element 7
+            Moving text!
 		</div>
 		<div id="div8">
-            Element 8
+            Moving text!
+		</div>
+		<div id="div9">
+            Moving text!
+		</div>
+		<div id="div10">
+            Moving text!
 		</div>
 	</body>
 </rml>
