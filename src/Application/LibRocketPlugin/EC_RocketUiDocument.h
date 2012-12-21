@@ -71,18 +71,26 @@ public:
     virtual void ProcessEvent(Rocket::Core::Event& event);
 
 public slots:
-    /// Set the position of an element within the document
-    void SetElementPosition(const QString& id, const QPoint& newPos);
-    /// Set the size of an element within the document
-    void SetElementSize(const QString& id, const QPoint& newSize);
-    /// Return the position of an element within the document
-    QPoint GetElementPosition(const QString& id);
-    /// Return the size of an element within the document
-    QPoint GetElementSize(const QString& id);
+    /// Set the position of an element within the document.
+    void SetElementPosition(const QString &id, const QPoint& newPos);
+    /// Set the size of an element within the document.
+    void SetElementSize(const QString &id, const QPoint& newSize);
+    /// Set the value of an input element.
+    void SetElementValue(const QString &id, const QString &newValue);
+    /// Return the position of an element within the document.
+    QPoint GetElementPosition(const QString &id) const;
+    /// Return the size of an element within the document.
+    QPoint GetElementSize(const QString &id) const;
+    /// Return the value of an input element, or empty if not applicable.
+    QString GetElementValue(const QString &id) const;
     
 signals:
-    /// Signaled when the UI document has been created
+    /// Signaled when the UI document has been created.
     void DocumentChanged();
+    /// An element has been clicked on the document.
+    void ElementClicked(const QString &id, const QString &tagName);
+    /// An input element's value has changed.
+    void ElementValueChanged(const QString &id, const QString &tagName, const QString &newValue);
     
 private slots:
     /// Called when document asset has been downloaded.
@@ -96,7 +104,9 @@ private:
     /// Get the Rocket UI context from the LibRocket module.
     Rocket::Core::Context* GetContext();
     /// Go through the elements in the document recursively and subscribe to applicable events.
-    void ProcessElementRecursive(Rocket::Core::Element* element);
+    void AddEventListeners(Rocket::Core::Element* element);
+    /// Remove event listeners recursively before removing the document.
+    void RemoveEventListeners(Rocket::Core::Element* element);
     
     /// Instantiated UI document.
     Rocket::Core::ElementDocument* document;

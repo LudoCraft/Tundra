@@ -47,7 +47,7 @@ void EC_RocketUiDocument::AttributesChanged()
     }
 }
 
-void EC_RocketUiDocument::SetElementPosition(const QString& id, const QPoint& newPos)
+void EC_RocketUiDocument::SetElementPosition(const QString &id, const QPoint& newPos)
 {
     if (document)
     {
@@ -59,7 +59,7 @@ void EC_RocketUiDocument::SetElementPosition(const QString& id, const QPoint& ne
     }
 }
 
-void EC_RocketUiDocument::SetElementSize(const QString& id, const QPoint& newSize)
+void EC_RocketUiDocument::SetElementSize(const QString &id, const QPoint& newSize)
 {
     if (document)
     {
@@ -76,7 +76,26 @@ void EC_RocketUiDocument::SetElementSize(const QString& id, const QPoint& newSiz
     }
 }
 
-QPoint EC_RocketUiDocument::GetElementPosition(const QString& id)
+void EC_RocketUiDocument::SetElementValue(const QString &id, const QString &newValue)
+{
+    if (document)
+    {
+        Rocket::Core::Element* element = document->GetElementById(Rocket::Core::String(id.toStdString().c_str()));
+        if (element)
+        {
+            Rocket::Controls::ElementFormControlInput* inputElem = dynamic_cast<Rocket::Controls::ElementFormControlInput*>(element);
+            if (inputElem)
+                inputElem->SetValue(Rocket::Core::String(newValue.toStdString().c_str()));
+            else
+                LogWarning("Element " + id + " is not an input element");
+        }
+        else
+            LogWarning("Element " + id + " not found for SetElementValue");
+    }
+    
+}
+
+QPoint EC_RocketUiDocument::GetElementPosition(const QString &id) const
 {
     if (document)
     {
@@ -92,7 +111,7 @@ QPoint EC_RocketUiDocument::GetElementPosition(const QString& id)
     return QPoint(0,0);
 }
 
-QPoint EC_RocketUiDocument::GetElementSize(const QString& id)
+QPoint EC_RocketUiDocument::GetElementSize(const QString &id) const
 {
     if (document)
     {
@@ -107,6 +126,26 @@ QPoint EC_RocketUiDocument::GetElementSize(const QString& id)
     LogWarning("Element " + id + " not found for GetElementSize");
     return QPoint(0,0);
 }
+
+QString EC_RocketUiDocument::GetElementValue(const QString &id) const
+{
+    if (document)
+    {
+        Rocket::Core::Element* element = document->GetElementById(Rocket::Core::String(id.toStdString().c_str()));
+        if (element)
+        {
+            Rocket::Controls::ElementFormControlInput* inputElem = dynamic_cast<Rocket::Controls::ElementFormControlInput*>(element);
+            if (inputElem)
+                return QString(inputElem->GetValue().CString());
+            else
+                LogWarning("Element " + id + " is not an input element");
+        }
+    }
+    
+    LogWarning("Element " + id + " not found for GetElementValue");
+    return QString();
+}
+
 
 void EC_RocketUiDocument::OnDocumentAssetLoaded(AssetPtr asset)
 {
@@ -135,7 +174,7 @@ void EC_RocketUiDocument::OnDocumentAssetLoaded(AssetPtr asset)
     }
     
     // Add event listeners
-    ProcessElementRecursive(document);
+    AddEventListeners(document);
     
     if (visible.Get())
         document->Show();
@@ -147,6 +186,9 @@ void EC_RocketUiDocument::RemoveDocument()
 {
     if (document)
     {
+        // Remove all event listeners we may have added
+        RemoveEventListeners(document);
+        
         document->RemoveReference();
         Rocket::Core::Context* context = GetContext();
         if (context)
@@ -163,19 +205,38 @@ Rocket::Core::Context* EC_RocketUiDocument::GetContext()
     return module ? module->GetContext() : 0;
 }
 
-void EC_RocketUiDocument::ProcessElementRecursive(Rocket::Core::Element* element)
+void EC_RocketUiDocument::AddEventListeners(Rocket::Core::Element* element)
 {
     if (!element)
         return;
     
-    /// \todo Adding event listeners causes iterator crash at exit; possibly need to be removed manually
-    //Rocket::Controls::ElementFormControlInput* inputElem = dynamic_cast<Rocket::Controls::ElementFormControlInput*>(element);
-    //if (inputElem)
-    //    inputElem->AddEventListener("change", this);
+    Rocket::Controls::ElementFormControlInput* inputElem = dynamic_cast<Rocket::Controls::ElementFormControlInput*>(element);
+    if (inputElem)
+    {
+        inputElem->AddEventListener("change", this);
+        inputElem->AddEventListener("click", this);
+    }
     
     int numChildren = element->GetNumChildren();
     for (int i = 0; i < numChildren; ++i)
-        ProcessElementRecursive(element->GetChild(i));
+        AddEventListeners(element->GetChild(i));
+}
+
+void EC_RocketUiDocument::RemoveEventListeners(Rocket::Core::Element* element)
+{
+    if (!element)
+        return;
+    
+    Rocket::Controls::ElementFormControlInput* inputElem = dynamic_cast<Rocket::Controls::ElementFormControlInput*>(element);
+    if (inputElem)
+    {
+        inputElem->RemoveEventListener("change", this);
+        inputElem->RemoveEventListener("click", this);
+    }
+    
+    int numChildren = element->GetNumChildren();
+    for (int i = 0; i < numChildren; ++i)
+        RemoveEventListeners(element->GetChild(i));
 }
 
 void EC_RocketUiDocument::ProcessEvent(Rocket::Core::Event& event)
@@ -184,6 +245,13 @@ void EC_RocketUiDocument::ProcessEvent(Rocket::Core::Event& event)
     if (!sender)
         return;
     
-    //LogInfo("Rocket event received: " + QString(event.GetType().CString()) + " from element id " + QString(sender->GetId().CString()) + " tagname " + QString(sender->GetTagName().CString()));
+    if (event.GetType() == "click")
+        emit ElementClicked(QString(sender->GetId().CString()), QString(sender->GetTagName().CString()));
+    else if (event.GetType() == "change")
+    {
+        Rocket::Controls::ElementFormControlInput* inputElem = dynamic_cast<Rocket::Controls::ElementFormControlInput*>(sender);
+        if (inputElem)
+            emit ElementValueChanged(QString(inputElem->GetId().CString()), QString(inputElem->GetTagName().CString()), QString(inputElem->GetValue().CString()));
+    }
 }
 
