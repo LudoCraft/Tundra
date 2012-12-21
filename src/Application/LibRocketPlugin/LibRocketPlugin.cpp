@@ -235,11 +235,14 @@ void LibRocketPlugin::OnKeyEventReceived(KeyEvent* evt)
         }
         
         // Suppress the key event from going to Qt if an input element is focused
+        /// \todo Currently disabled. Rocket leaves the last input element focused, even if clicking on an empty part of the UI canvas
+        /*
         {
             Rocket::Core::Element* focus = context->GetFocusElement();
             if (focus && dynamic_cast<Rocket::Controls::ElementFormControlInput*>(focus))
                 evt->Suppress();
         }
+        */
         break;
         
     case KeyEvent::KeyReleased:

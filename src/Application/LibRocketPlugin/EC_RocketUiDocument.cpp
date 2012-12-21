@@ -36,7 +36,12 @@ void EC_RocketUiDocument::AttributesChanged()
         return;
     
     if (documentRef.ValueChanged())
-        documentAsset->HandleAssetRefChange(&documentRef);
+    {
+        if (!documentRef.Get().ref.trimmed().isEmpty())
+            documentAsset->HandleAssetRefChange(&documentRef);
+        else
+            RemoveDocument();
+    }
     
     if (visible.ValueChanged() && document)
     {

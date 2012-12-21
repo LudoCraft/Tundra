@@ -1,0 +1,54 @@
+<rml>
+	<head>
+		<title>RocketUI moving label animation test</title>
+		<style>
+			body
+			{
+            	font-family: Arial;
+            	font-weight: normal;
+            	font-style: normal;
+            	font-size: 15;
+            	color: white;
+				margin: auto;
+			}
+
+			div
+			{
+            	display: inline-block;
+                width: 120px;
+
+            	font-size: 18;
+            	text-align: center;
+            	tab-index: auto;
+                background-color: #ff8800;
+			}
+
+		</style>
+	</head>
+	<body>
+		<div id="div1">
+            Element 1
+		</div>
+		<div id="div2">
+            Element 2
+		</div>
+		<div id="div3">
+            Element 3
+		</div>
+		<div id="div4">
+            Element 4
+		</div>
+		<div id="div5">
+            Element 5
+		</div>
+		<div id="div6">
+            Element 6
+		</div>
+		<div id="div7">
+            Element 7
+		</div>
+		<div id="div8">
+            Element 8
+		</div>
+	</body>
+</rml>
