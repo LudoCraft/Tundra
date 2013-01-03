@@ -30,6 +30,8 @@ function LogD(msg) { console.LogDebug(msg); }
 // Entry point for the script.
 if (server.IsRunning())
 {
+    console.RegisterCommand("setImEnabled", "Sets interest management enabled or disabled").Invoked.connect(SetInterestManagementEnabled);
+    LogW("asfdsa");
     // numRows and numCols must be uneven and >= 3: 3,5,7,9,...
     const numRows = numCols = 3;
 
@@ -50,6 +52,23 @@ if (server.IsRunning())
     var currentBlock = null;
 
     Start();
+}
+
+// http://stackoverflow.com/questions/263965/how-can-i-convert-a-string-to-boolean-in-javascript
+function StringToBoolean(str)
+{
+    switch(str.toLowerCase())
+    {
+    case "true": case "yes": case "1": return true;
+    case "false": case "no": case "0": case null: return false;
+    default: return Boolean(str);
+    }
+}
+
+function SetInterestManagementEnabled(params)
+{
+    syncmanager.interesetManagementEnabled = StringToBoolean(params[0]);
+    Log("syncmanager.interestManagementEnabled " + syncmanager.interesetManagementEnabled);
 }
 
 // Structure representing one scene block in the NxN scene block matrix.
