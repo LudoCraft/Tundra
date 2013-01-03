@@ -488,6 +488,7 @@ SimpleAvatar.prototype.ClientCreateAvatarCamera = function() {
 
     // Set initial position
     this.ClientUpdateAvatarCamera();
+    syncmanager.observer = cameraentity;
 }
 
 SimpleAvatar.prototype.GestureStarted = function(gestureEvent) {
