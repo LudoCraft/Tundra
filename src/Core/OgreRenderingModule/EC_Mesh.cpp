@@ -244,7 +244,7 @@ float3x4 EC_Mesh::LocalToWorld() const
 
 bool EC_Mesh::SetMesh(QString meshResourceName, bool clone)
 {
-    if (!ViewEnabled())
+    if (!ViewEnabled() || world_.expired())
         return false;
     
     OgreWorldPtr world = world_.lock();
@@ -264,16 +264,14 @@ bool EC_Mesh::SetMesh(QString meshResourceName, bool clone)
                 placeable_ = placeable;
         }
     }
-    
-    Ogre::SceneManager* sceneMgr = world->OgreSceneManager();
-    
+
     Ogre::Mesh* mesh = PrepareMesh(mesh_name, clone);
     if (!mesh)
         return false;
     
     try
     {
-        entity_ = sceneMgr->createEntity(world->GetUniqueObjectName("EC_Mesh_entity"), mesh->getName());
+        entity_ = world->OgreSceneManager()->createEntity(world->GetUniqueObjectName("EC_Mesh_entity"), mesh->getName());
         if (!entity_)
         {
             LogError("EC_Mesh::SetMesh: Could not set mesh " + mesh_name);
@@ -340,8 +338,6 @@ bool EC_Mesh::SetMeshWithSkeleton(const std::string& mesh_name, const std::strin
     
     RemoveMesh();
 
-    Ogre::SceneManager* sceneMgr = world->OgreSceneManager();
-    
     Ogre::Mesh* mesh = PrepareMesh(mesh_name, clone);
     if (!mesh)
         return false;
@@ -359,7 +355,7 @@ bool EC_Mesh::SetMeshWithSkeleton(const std::string& mesh_name, const std::strin
     
     try
     {
-        entity_ = sceneMgr->createEntity(world->GetUniqueObjectName("EC_Mesh_entwithskel"), mesh->getName());
+        entity_ = world->OgreSceneManager()->createEntity(world->GetUniqueObjectName("EC_Mesh_entwithskel"), mesh->getName());
         if (!entity_)
         {
             LogError("EC_Mesh::SetMeshWithSkeleton: Could not set mesh " + mesh_name);
@@ -397,6 +393,8 @@ bool EC_Mesh::SetMeshWithSkeleton(const std::string& mesh_name, const std::strin
 void EC_Mesh::RemoveMesh()
 {
     OgreWorldPtr world = world_.lock();
+    if (!world)
+        return;
 
     if (entity_)
     {
@@ -405,9 +403,7 @@ void EC_Mesh::RemoveMesh()
         RemoveAllAttachments();
         DetachEntity();
         
-        Ogre::SceneManager* sceneMgr = world->OgreSceneManager();
-        sceneMgr->destroyEntity(entity_);
-        
+        world->OgreSceneManager()->destroyEntity(entity_);
         entity_ = 0;
     }
     
@@ -709,11 +705,7 @@ Ogre::Entity* EC_Mesh::GetAttachmentEntity(uint index) const
 
 uint EC_Mesh::GetNumSubMeshes() const
 {
-    uint count = 0;
-    if (HasMesh())
-        if (entity_->getMesh().get())
-            count = entity_->getMesh()->getNumSubMeshes();
-    return count;
+    return (HasMesh() && !entity_->getMesh().isNull() ? entity_->getMesh()->getNumSubMeshes() : 0);
 }
 
 const std::string& EC_Mesh::GetMeshName() const
@@ -746,7 +738,7 @@ const std::string& EC_Mesh::GetSkeletonName() const
 
 void EC_Mesh::DetachEntity()
 {
-    if ((!attached_) || (!entity_) || (!placeable_))
+    if (!attached_ || !entity_ || !placeable_)
         return;
     
     EC_Placeable* placeable = checked_static_cast<EC_Placeable*>(placeable_.get());
@@ -758,7 +750,7 @@ void EC_Mesh::DetachEntity()
 
 void EC_Mesh::AttachEntity()
 {
-    if ((attached_) || (!entity_) || (!placeable_))
+    if (attached_ || !entity_ || !placeable_)
         return;
     
     EC_Placeable* placeable = checked_static_cast<EC_Placeable*>(placeable_.get());
@@ -880,9 +872,8 @@ void EC_Mesh::OnAttributeUpdated(IAttribute *attribute)
     }
     else if (attribute == &meshRef)
     {
-        if (!ViewEnabled())
-            return;
-            
+        /// @note Handle mesh ref change regardless whether we're running as headless or not, otherwise OgreMeshAsset::ogreMesh will be null.
+        /// The mesh data is something that is useful in headless mode too. f.ex. for bounding volume retrieval.
         if (meshRef.Get().ref.trimmed().isEmpty())
             LogDebug("Warning: Mesh \"" + this->parentEntity->Name() + "\" mesh ref was set to an empty reference!");
         meshAsset->HandleAssetRefChange(&meshRef);
@@ -1023,14 +1014,14 @@ void EC_Mesh::OnMaterialAssetLoaded(AssetPtr asset)
     AssetReferenceList materialList = meshMaterial.Get();
     for(int i = 0; i < materialList.Size(); ++i)
         if (materialList[i].ref.compare(ogreMaterial->Name(), Qt::CaseInsensitive) == 0 ||
-            framework->Asset()->ResolveAssetRef("", materialList[i].ref).compare(ogreMaterial->Name(), Qt::CaseInsensitive) == 0) ///<///\todo The design of whether the ResolveAssetRef should occur here, or internal to Asset API needs to be revisited.
+            framework->Asset()->ResolveAssetRef("", materialList[i].ref).compare(ogreMaterial->Name(), Qt::CaseInsensitive) == 0) /**< @todo The design of whether the ResolveAssetRef should occur here, or internal to Asset API needs to be revisited. */
         {
             SetMaterial(i, ogreMaterial->Name());
             assetUsed = true;
         }
 
     // This check & debug print is now in Debug mode only. Rapid changes in materials and the delay-loaded nature of assets makes it unavoidable in some cases.
-    #ifdef _DEBUG
+#ifdef _DEBUG
     if (!assetUsed)
     {
         LogDebug("OnMaterialAssetLoaded: Trying to apply material \"" + ogreMaterial->Name() + "\" to mesh " +
@@ -1038,7 +1029,7 @@ void EC_Mesh::OnMaterialAssetLoaded(AssetPtr asset)
         for(int i = 0; i < materialList.Size(); ++i)
             LogDebug(QString::number(i) + ": " + materialList[i].ref);
     }
-    #endif
+#endif
 }
 
 void EC_Mesh::OnMaterialAssetFailed(IAssetTransfer* transfer, QString reason)
