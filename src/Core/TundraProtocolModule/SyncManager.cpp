@@ -2450,17 +2450,17 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
         //if (rigibBody)
 
         OBB worldObb;
-        /// @todo WorldOBB retrieval when in headless mode.
-        /*if (framework_->IsHeadless())
+        if (framework_->IsHeadless())
         {
-            // EC_Mesh::WorldOBB not usable in headless mode so we must dig the OBB information from OgreMeshAsset instead.
+            // EC_Mesh::WorldOBB not usable in headless mode (no Ogre::Entity available),
+            // so we must dig the bounding volume information from OgreMeshAsset (Ogre::Mesh) instead.
             Ogre::MeshPtr ogreMesh = mesh->MeshAsset() ? mesh->MeshAsset()->ogreMesh : Ogre::MeshPtr();
-            /// @todo what if ogreMesh.isNull?
+            if (ogreMesh.isNull())
+                LogWarning("SyncManager::ComputePriorityForEntitySyncState: Ogre mesh null for " + mesh->GetMeshName());
             worldObb = !ogreMesh.isNull() ? AABB(ogreMesh->getBounds()) : OBB();
-            LogDebug(worldObb.toString());
             worldObb.Transform(placeable->LocalToWorld());
         }
-        else*/
+        else
             worldObb = mesh->WorldOBB();
         float sizeSq = worldObb.SurfaceArea();
         sizeSq *= sizeSq;
