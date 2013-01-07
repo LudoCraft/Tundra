@@ -9,19 +9,27 @@
 // !ref: WaypointBot.txml
 // !ref: FireEaterBot.txml
 
-// TODOs:
-// 1) Get FireEaters working
-// 2) Code cleanup and generic and reusable functions for manipulating the scene block matrix
-// 3) Find good terrain size and N for scene block matrix
-// 4) Use active cam pos instead of avatar pos
-// 5) Find good amount of fire eaters for 
-// 6) ...
-
 function OnScriptDestroyed()
 {
+    if (framework.IsExiting())
+        return;
+    console.UnregisterCommand("setImEnabled");
     Stop();
 }
 
+function ParseBool(str)
+{
+    str = str.trim().toLowerCase();
+    return (str == "true" || str == "yes" || str == "1" || str == "y" || str == "on") ? true : false;
+}
+
+function SetInterestManagementEnabled(params)
+{
+    syncmanager.interesetManagementEnabled = ParseBool(params[0]);
+    Log("syncmanager.interestManagementEnabled " + syncmanager.interesetManagementEnabled);
+}
+
+// Logging shortcuts
 function Log(msg) { console.LogInfo(msg); }
 function LogW(msg) { console.LogWarning(msg); }
 function LogE(msg) { console.LogError(msg); }
@@ -31,7 +39,7 @@ function LogD(msg) { console.LogDebug(msg); }
 if (server.IsRunning())
 {
     console.RegisterCommand("setImEnabled", "Sets interest management enabled or disabled").Invoked.connect(SetInterestManagementEnabled);
-    LogW("asfdsa");
+
     // numRows and numCols must be uneven and >= 3: 3,5,7,9,...
     const numRows = numCols = 3;
 
@@ -51,24 +59,15 @@ if (server.IsRunning())
     var previousBlock = null;
     var currentBlock = null;
 
+    scene.physics.Updated.connect(ServerPhysicsUpdate);
+    if (!framework.IsHeadless())
+        frame.Updated.connect(AnimationUpdate);
+
     Start();
 }
-
-// http://stackoverflow.com/questions/263965/how-can-i-convert-a-string-to-boolean-in-javascript
-function StringToBoolean(str)
+else // Client simply updates animation, no other logic
 {
-    switch(str.toLowerCase())
-    {
-    case "true": case "yes": case "1": return true;
-    case "false": case "no": case "0": case null: return false;
-    default: return Boolean(str);
-    }
-}
-
-function SetInterestManagementEnabled(params)
-{
-    syncmanager.interesetManagementEnabled = StringToBoolean(params[0]);
-    Log("syncmanager.interestManagementEnabled " + syncmanager.interesetManagementEnabled);
+    frame.Updated.connect(AnimationUpdate);
 }
 
 // Structure representing one scene block in the NxN scene block matrix.
@@ -79,6 +78,7 @@ function SceneBlock(name, row, col, pos)
     this.col = col;
     this.pos = pos;
     this.entities = [];
+    this.bots = [];
     this.aabb = new AABB(pos, new float3(pos.x + blockWidth, blockHeight, pos.z + blockWidth));
 }
 
@@ -101,8 +101,6 @@ function Start()
 
 function Stop()
 {
-    if (framework.IsExiting())
-        return;
     if (server.IsRunning())
     {
         for(var i = 0; i < numRows; ++i)
@@ -117,7 +115,7 @@ function HandleUserConnected(id, user)
     // TODO
 //    if (sceneBlocks[0][0] == null)
 //        CreateWorld();
-    userEntity = scene.GetEntityByName("Avatar" + id);
+    userEntity = scene.EntityByName("Avatar" + id);
     if (userEntity)
     {
         var userStartPos;
@@ -167,7 +165,7 @@ function SceneBlockAt(pos)
 {
     for(var i = 0; i < sceneBlocks.length; ++i)
         for(var j = 0; j < sceneBlocks[i].length; ++j)
-            if (sceneBlocks[i][j].aabb.Contains(pos))
+            if (sceneBlocks[i][j] != null && sceneBlocks[i][j].aabb.Contains(pos))
                 return sceneBlocks[i][j];
     return null;
 }
@@ -200,14 +198,15 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
     var aabb = new AABB(pos, new float3(pos.x + blockWidth, blockHeight, pos.z + blockWidth));
 //    var botPrefab = asset.GetAsset("FireEaterBot.txml").DiskSource();
     var botPrefab = asset.GetAsset("WaypointBot.txml").DiskSource();
-    const numBots = 3;
+    const numBots = 6;
     var bots = [];
     for(i = 0; i < numBots; ++i)
     {
-        var bot = scene.LoadSceneXML(botPrefab, false, false, 0);
+        var bot = scene.LoadSceneXML(botPrefab, false, false, 0)[0];
         var randomPos = aabb.PointInside(Math.random(), 0.01, Math.random());
-        bot[0].placeable.SetPosition(randomPos);
-        bots.push(bot[0]);
+        bot.placeable.SetPosition(randomPos);
+        InitWaypoints(bot);
+        bots.push(bot);
     }
 
     // Set up FireEaters
@@ -230,8 +229,9 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
     var newBlock = new SceneBlock(blockName, rowIdx, colIdx, pos);
     //newBlock.entities = entities;
     newBlock.entities = entities.concat(bots);
+    newBlock.bots = bots;
+
     Log("Scene block " + newBlock + " instantiated at " + entities[0].terrain.nodeTransformation.pos);
-    
 
     return newBlock;
 }
@@ -304,10 +304,10 @@ function CenterLeftBlock() { return sceneBlocks[(numRows-1)/2][0]; }
 
 var timer = 0;
 var checkInterval = 2; // in seconds
+var drawDebug = false;
 
 function Update(frameTime)
 {
-    var drawDebug = false;
     if (drawDebug)
         for(var i in sceneBlocks)
             for(var j in sceneBlocks[i])
@@ -322,7 +322,7 @@ function Update(frameTime)
     timer = 0;
 
     currentBlock = SceneBlockAt(userEntity.placeable.transform.pos);
-    if (!currentBlock)  // Should happen only if scene matrix in malformed state
+    if (!currentBlock) // Should happen only if scene matrix in malformed state
     {
         LogE("Update: could not find where the user at!");
         return;
@@ -648,4 +648,81 @@ function Update(frameTime)
     }
 
     previousBlock = currentBlock;
+}
+
+// Bot functionality begins here
+
+function InitWaypoints(/*Entity*/ bot)
+{
+    bot.waypoints = [new float3(10, 0, 10), new float3(-10, 0, 10), new float3(-10, 0, -10), new float3(10, 0, -10)];
+    bot.currentWaypoint = 0;
+    for(var i = 0; i < bot.waypoints.length; ++i)
+        bot.waypoints[i] = bot.waypoints[i].Add(bot.placeable.WorldPosition());
+}
+
+function ServerPhysicsUpdate(frameTime)
+{
+    if (!currentBlock)
+        return;
+
+    for(var i = 0; i < numRows; ++i)
+        for(var j = 0; j < numCols; ++j)
+        {
+            var block = sceneBlocks[i][j];
+            for(var k = 0; k < block.bots.length; ++k)
+            {
+                var bot = block.bots[k];
+
+                var targetPos = bot.waypoints[bot.currentWaypoint];
+                TurnToSmooth(bot, ComputeTargetHeading(bot, targetPos), 0.05);
+
+                // Move the bot
+                bot.rigidbody.linearVelocity = bot.placeable.Orientation().Mul(new float3(0, 0, -5));
+
+                if (HasReachedTarget(bot, targetPos, 0.25))
+                    if (++bot.currentWaypoint >= bot.waypoints.length)
+                        bot.currentWaypoint = 0; // start over
+            }
+        }
+}
+
+function AnimationUpdate(frameTime)
+{
+    if (!currentBlock)
+        return;
+    for(i in currentBlock.bots)
+    {
+        var bot = currentBlock.bots[i];
+        if (!bot.mesh.HasMesh())
+            continue; // mesh and/or skeleton not loaded yet
+
+        if (!bot.animationcontroller.IsAnimationActive("Walk"))
+            bot.animationcontroller.EnableAnimation("Walk", true, 0.25, false)
+
+        // Scale the current playback speed of the walk animation according to our linear velocity
+        me.animationcontroller.SetAnimationSpeed("Walk", 0.3 * me.rigidbody.linearVelocity.Length());
+    }
+}
+
+// Rotates smoothly (slerp) the bot around the Y-axis towards a target heading in degrees
+function TurnToSmooth(entity, targetHeading, weight)
+{
+    var targetRot = new Quat(new float3(0, 1, 0), targetHeading / (180 / Math.PI));
+    entity.placeable.SetOrientation(entity.placeable.Orientation().Slerp(targetRot, weight));
+}
+
+// Calculates the heading (rotation arond Y-axis) required to look from the bot's current position to a target
+function ComputeTargetHeading(entity, targetPos)
+{
+    var targetDirection = targetPos.Sub(entity.placeable.WorldPosition());
+    targetDirection.y = 0; // for now at least, we're only interested in motion on the XZ plane
+    return Math.atan2(-targetDirection.x, -targetDirection.z) * (180 / Math.PI);
+}
+
+// Checks if the bot has reached a target position, with a threshold distance given
+function HasReachedTarget(entity, targetPos, threshold)
+{
+    var currentPos = entity.placeable.WorldPosition();
+    targetPos.y = currentPos.y = 0; // for now at least, we're only interested in motion on the XZ plane
+    return targetPos.Sub(currentPos).Length() < threshold;
 }
