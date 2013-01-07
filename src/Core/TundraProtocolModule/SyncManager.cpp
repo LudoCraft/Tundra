@@ -131,6 +131,7 @@ void SyncManager::SetObserver(Entity *entity)
 void SyncManager::SetUpdatePeriod(float period)
 {
     // Allow max 100fps
+    /// @todo Make max update period value public information
     if (period < 0.01f)
         period = 0.01f;
     updatePeriod_ = period;
@@ -155,7 +156,6 @@ void SyncManager::GetClientExtrapolationTime()
 
 SceneSyncState* SyncManager::SceneState(int connectionId)
 {
-    LogWarning("SyncManager::SceneState is deprecated and will be deleted. Use UserConnection::SyncState instead.");
     return SceneState(owner_->GetServer()->GetUserConnection(connectionId));
 }
 
@@ -2388,12 +2388,12 @@ void SyncManager::SendObserverPosition(kNet::MessageConnection *connection, Scen
 
 void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, EntitySyncState *entityState, Entity *entity) const
 {
+    assert(sceneState);
     assert(entityState || entity);
     if (!sceneState)
         return;
     if (!sceneState->observerPos.IsFinite() || !sceneState->observerRot.IsFinite())
         return; // camera information not received yet.
-
     if (!entityState && entity)
     {
         if (sceneState->entities.find(entity->Id()) == sceneState->entities.end())
@@ -2407,10 +2407,11 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
         entity = scene_.lock()->EntityById(entityState->id).get();
 //    assert((entity && entityState));
     if (!entityState || !entity)
-        return; // we might end up here e.g. when entity was deleted
+        return; // we (might) end up here e.g. when entity was just deleted
 
     boost::shared_ptr<EC_Placeable> placeable = entity->GetComponent<EC_Placeable>();
     boost::shared_ptr<EC_Mesh> mesh = entity->GetComponent<EC_Mesh>();
+//    boost::shared_ptr<EC_RigidBody> rigidBody = entity->GetComponent<EC_RigidBody>();
     /// @todo handle audio sources
 /*
 #ifdef EC_Sound_ENABLED
@@ -2427,12 +2428,10 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
     /// @todo Handle terrains
 //    boost::shared_ptr<EC_Terrain> terrain = entity->GetComponent<EC_Terrain>();
 //    if (terrain)
-    /// @todo Handle entities with rigid body but no placeable
-//    boost::shared_ptr<EC_RigidBody> rigidBody = entity->GetComponent<EC_RigidBody>();
-//    if (!placeable && rigidBody)
-
     if (!placeable)
     {
+        /// @todo Should handle special case entities with rigid body but no placeable?
+        //if (rigidBody)
         // Non-spatial (probably), use max priority
         /// @todo Can have f.ex. Terrain component that has its own transform, but it can use Placeable too.
         entityState->priority = inf;
@@ -2447,6 +2446,9 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
     }
     else if (placeable && mesh)
     {
+        /// @todo Take direction and velocity of rigid bodies into account
+        //if (rigibBody)
+
         OBB worldObb;
         /// @todo WorldOBB retrieval when in headless mode.
         /*if (framework_->IsHeadless())
@@ -2467,10 +2469,11 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
 //        LogDebug(QString("%1 sizeSq %2 distanceSq %3").arg(entity->ToString()).arg(sizeSq).arg(distanceSq));
     }
 
-    /// @todo Hardcoded relevancy 2 for entities with Avatar component and 1 for others for now.
+    /// @todo Hardcoded relevancy of 10 for entities with Avatar component and 1 for others for now.
     entityState->relevancy = entity->GetComponent("EC_Avatar") ? 10.f : 1.f;
-//    if (entity->GetComponent("EC_Avatar"))//!EqualAbs(oldPrio, entityState->PrioritizedUpdateInterval()))
-//        LogDebug(QString("IM: %1 prio %2 rel %3 updateInterval %4").arg(entity->ToString()).arg(entityState->priority).arg(entityState->relevancy).arg(entityState->PrioritizedUpdateInterval()));
+//    if (entity->GetComponent("EC_Avatar"))//!EqualAbs(oldPrio, entityState->ComputePrioritizedUpdateInterval()))
+//    LogDebug(QString("IM: %1 prio %2 rel %3 prio*rel %4 updateInterval %5").arg(entity->ToString()).arg(
+//        entityState->priority).arg(entityState->relevancy).arg(entityState->FinalPriority()).arg(entityState->ComputePrioritizedUpdateInterval(updatePeriod_)));
 }
 
 void SyncManager::ComputePrioritiesForEntitySyncStates(SceneSyncState *sceneState) const
@@ -2496,9 +2499,11 @@ void SyncManager::HandleObserverPosition(kNet::MessageConnection* source, const 
     rot.z = dd.Read<float>();
     if (!pos.Equals(syncState->observerPos) || !rot.Equals(syncState->observerRot))
     {
+        // Save observer information always, but compute priorities only if IM enabled.
         syncState->observerPos = pos;
         syncState->observerRot = rot;
-        ComputePrioritiesForEntitySyncStates(syncState);
+        if (interestManagementEnabled)
+            ComputePrioritiesForEntitySyncStates(syncState);
     }
 }
 
