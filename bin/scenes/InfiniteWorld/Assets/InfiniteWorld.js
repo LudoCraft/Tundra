@@ -14,6 +14,7 @@ function OnScriptDestroyed()
     if (framework.IsExiting())
         return;
     console.UnregisterCommand("setImEnabled");
+    console.UnregisterCommand("setPhysicsMotorEnabled");
     Stop();
 }
 
@@ -26,7 +27,15 @@ function ParseBool(str)
 function SetInterestManagementEnabled(params)
 {
     syncmanager.interesetManagementEnabled = ParseBool(params[0]);
-    Log("syncmanager.interestManagementEnabled " + syncmanager.interesetManagementEnabled);
+    Log("interestManagementEnabled " + syncmanager.interesetManagementEnabled);
+}
+
+var usePhysicsMotor = true;
+
+function SetPhysicsMotorEnabled(params)
+{
+    usePhysicsMotor = ParseBool(params[0]);
+    Log("usePhysicsMotor " + syncmanager.interesetManagementEnabled);
 }
 
 // Logging shortcuts
@@ -39,6 +48,7 @@ function LogD(msg) { console.LogDebug(msg); }
 if (server.IsRunning())
 {
     console.RegisterCommand("setImEnabled", "Sets interest management enabled or disabled").Invoked.connect(SetInterestManagementEnabled);
+    console.RegisterCommand("setPhysicsMotorEnabled", "Sets usage of PhysicsMotor enabled or disabled").Invoked.connect(SetPhysicsMotorEnabled);
 
     // numRows and numCols must be uneven and >= 3: 3,5,7,9,...
     const numRows = numCols = 3;
@@ -60,16 +70,18 @@ if (server.IsRunning())
     var currentBlock = null;
 
     scene.physics.Updated.connect(ServerPhysicsUpdate);
-    if (!framework.IsHeadless())
-        frame.Updated.connect(AnimationUpdate);
+//    if (!framework.IsHeadless())
+//        frame.Updated.connect(AnimationUpdate);
 
     Start();
 }
+/*
 else // Client simply updates animation, no other logic
 {
     frame.Updated.connect(AnimationUpdate);
 }
-
+*/
+    
 // Structure representing one scene block in the NxN scene block matrix.
 function SceneBlock(name, row, col, pos)
 {
@@ -654,7 +666,9 @@ function Update(frameTime)
 
 function InitWaypoints(/*Entity*/ bot)
 {
-    bot.waypoints = [new float3(10, 0, 10), new float3(-10, 0, 10), new float3(-10, 0, -10), new float3(10, 0, -10)];
+    if (usePhysicsMotor)
+        bot.physicsmotor.dampingForce = new float3(3.0, 0.0, 3.0); // TODO Randomize?
+    bot.waypoints = [new float3(10, 0, 10), new float3(-10, 0, 10), new float3(-10, 0, -10), new float3(10, 0, -10)]; // TODO Randomize?
     bot.currentWaypoint = 0;
     for(var i = 0; i < bot.waypoints.length; ++i)
         bot.waypoints[i] = bot.waypoints[i].Add(bot.placeable.WorldPosition());
@@ -664,6 +678,8 @@ function ServerPhysicsUpdate(frameTime)
 {
     if (!currentBlock)
         return;
+    
+    profiler.BeginBlock("InfiniteWorld_ServerPhysicsUpdate");
 
     for(var i = 0; i < numRows; ++i)
         for(var j = 0; j < numCols; ++j)
@@ -677,15 +693,21 @@ function ServerPhysicsUpdate(frameTime)
                 TurnToSmooth(bot, ComputeTargetHeading(bot, targetPos), 0.05);
 
                 // Move the bot
-                bot.rigidbody.linearVelocity = bot.placeable.Orientation().Mul(new float3(0, 0, -5));
+                if (usePhysicsMotor)
+                    bot.physicsmotor.absoluteMoveForce = bot.placeable.Orientation().Mul(new float3(0, 0, -15)); // TODO Randomize?
+                else
+                    bot.rigidbody.linearVelocity = bot.placeable.Orientation().Mul(new float3(0, 0, -5)); // TODO Randomize?
 
                 if (HasReachedTarget(bot, targetPos, 0.25))
                     if (++bot.currentWaypoint >= bot.waypoints.length)
                         bot.currentWaypoint = 0; // start over
             }
         }
+
+    profiler.EndBlock();
 }
 
+/*
 function AnimationUpdate(frameTime)
 {
     if (!currentBlock)
@@ -703,6 +725,7 @@ function AnimationUpdate(frameTime)
         me.animationcontroller.SetAnimationSpeed("Walk", 0.3 * me.rigidbody.linearVelocity.Length());
     }
 }
+*/
 
 // Rotates smoothly (slerp) the bot around the Y-axis towards a target heading in degrees
 function TurnToSmooth(entity, targetHeading, weight)

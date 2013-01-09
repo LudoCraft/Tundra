@@ -19,7 +19,7 @@
   <component type="EC_Mesh" sync="1">
    <attribute value="0,-1.2,0,0,0,0,1,1,1" name="Transform"/>
    <attribute value="Roboto.mesh" name="Mesh ref"/>
-   <attribute value="Roboto.skeleton" name="Skeleton ref"/>
+   <attribute value="" name="Skeleton ref"/>
    <attribute value="Roboto.material" name="Mesh materials"/>
    <attribute value="0" name="Draw distance"/>
    <attribute value="true" name="Cast shadows"/>
@@ -43,6 +43,11 @@
    <attribute value="0.000000 0.000000 0.000000" name="Angular velocity"/>
    <attribute value="-1" name="Collision Layer"/>
    <attribute value="-1" name="Collision Mask"/>
+  </component>
+  <component temporary="false" type="EC_PhysicsMotor" sync="false">
+   <attribute value="0.000000 0.000000 0.000000" name="Absolute Move Force"/>
+   <attribute value="0.000000 0.000000 0.000000" name="Relative Move Force"/>
+   <attribute value="0.000000 0.000000 0.000000" name="Damping Force"/>
   </component>
   <!--
   <component type="EC_Script" sync="1">
