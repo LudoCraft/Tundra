@@ -11,6 +11,7 @@
 
 #include <QDateTime>
 #include <QByteArray>
+#include <QPointer>
 
 class QNetworkAccessManager;
 class QNetworkRequest;
@@ -40,8 +41,12 @@ public:
     /** @return true if this asset provider can handle the id */
     virtual bool IsValidRef(QString assetRef, QString assetType = "");
     
+    /// Request a http asset, returns resulted transfer.
     virtual AssetTransferPtr RequestAsset(QString assetRef, QString assetType);
 
+    /// Aborts the ongoing http transfer.
+    virtual bool AbortTransfer(IAssetTransfer *transfer);
+    
     /// Adds the given http URL to the list of current asset storages.
     /// Returns the newly created storage, or 0 if a storage with the given name already existed, or if some other error occurred.
     /// @param storageName An identifier for the storage. Remember that Asset Storage names are case-insensitive.
@@ -107,7 +112,7 @@ private:
     QNetworkAccessManager *networkAccessManager;
 
     /// Maps each Qt Http download transfer we start to Asset API internal HttpAssetTransfer struct.
-    typedef std::map<QNetworkReply*, HttpAssetTransferPtr> TransferMap;
+    typedef std::map<QPointer<QNetworkReply>, HttpAssetTransferPtr> TransferMap;
     TransferMap transfers;
 
     /// Maps each Qt Http upload transfer we start to Asset API internal HttpAssetTransfer struct.

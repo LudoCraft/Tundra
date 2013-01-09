@@ -17,6 +17,10 @@
 #include "LoggingFunctions.h"
 #include "MemoryLeakCheck.h"
 
+#ifdef ASSIMP_ENABLED
+#include "OpenAssetImport.h"
+#endif
+
 OgreMeshAsset::~OgreMeshAsset()
 {
     Unload();
@@ -48,7 +52,7 @@ bool OgreMeshAsset::DeserializeFromData(const u8 *data_, size_t numBytes, bool a
     /// Force an unload of this data first.
     Unload();
 
-    if (assetAPI->GetFramework()->IsHeadless() || assetAPI->GetFramework()->HasCommandLineParameter("--no_async_asset_load") || !assetAPI->GetAssetCache() || (OGRE_THREAD_SUPPORT == 0))
+    if (assetAPI->GetFramework()->IsHeadless() || assetAPI->GetFramework()->HasCommandLineParameter("--no_async_asset_load") || !assetAPI->GetAssetCache() || (OGRE_THREAD_SUPPORT == 0) || IsAssimpFileType())
         allowAsynchronous = false;
     QString cacheDiskSource;
     if (allowAsynchronous)
@@ -94,6 +98,18 @@ bool OgreMeshAsset::DeserializeFromData(const u8 *data_, size_t numBytes, bool a
         ogreMesh->setAutoBuildEdgeLists(false);
     }
 
+	// Convert file to Ogre mesh using assimp
+    if (IsAssimpFileType())
+    {
+#ifdef ASSIMP_ENABLED
+        ConvertAssimpDataToOgreMesh(data_, numBytes);
+        return true;
+#else
+        LogError(QString("OgreMeshAsset::DeserializeFromData: cannot convert " + Name() + " to Ogre mesh. OpenAssetImport is not enabled."));
+        return false;
+#endif
+    }
+
     try
     {
         std::vector<u8> tempData(data_, data_ + numBytes);
@@ -106,20 +122,21 @@ bool OgreMeshAsset::DeserializeFromData(const u8 *data_, size_t numBytes, bool a
     catch (Ogre::Exception &e)
     {
         LogError(QString("OgreMeshAsset::DeserializeFromData: Ogre::MeshSerializer::importMesh failed when loading asset '" + Name() + "': ") + e.what());
+
+        if(IsAssimpFileType())
+            LogError(QString("OgreMeshAsset::DeserializeFromData: cannot convert " + Name() + " to Ogre mesh. OpenAssetImport is not enabled."));
+
         return false;
     }
-    
+
     if (GenerateMeshData())
     {        
         // We did a synchronous load, must call AssetLoadCompleted here.
         assetAPI->AssetLoadCompleted(Name());
         return true;
     }
-
     else 
-    {
         return false;
-    }
 }
 
 struct KdTreeRayQueryFirstHitVisitor
@@ -369,7 +386,8 @@ bool OgreMeshAsset::GenerateMeshData()
     try
     {
         // Assign default materials that won't complain
-        SetDefaultMaterial();
+		if (!IsAssimpFileType())
+        	SetDefaultMaterial();
         // Set asset references the mesh has
         //ResetReferences();
     }
@@ -390,7 +408,10 @@ void OgreMeshAsset::operationCompleted(Ogre::BackgroundProcessTicket ticket, con
 {
     if (ticket != loadTicket_)
         return;
-
+    
+    // Reset to 0 to mark the asynch request is not active anymore. Aborted in Unload() if it is.
+    loadTicket_ = 0;
+    
     const QString assetRef = Name();
     if (!result.error)
     {
@@ -420,6 +441,14 @@ void OgreMeshAsset::operationCompleted(Ogre::BackgroundProcessTicket ticket, con
 
 void OgreMeshAsset::DoUnload()
 {
+    // If a ongoing asynchronous asset load requested has been made to ogre, we need to abort it.
+    // Otherwise Ogre will crash to our raw pointer that was passed if we get deleted. A ongoing ticket id cannot be 0.
+    if (loadTicket_ != 0)
+    {
+        Ogre::ResourceBackgroundQueue::getSingleton().abortRequest(loadTicket_);
+        loadTicket_ = 0;
+    }
+    
     if (ogreMesh.isNull())
         return;
 
@@ -478,3 +507,50 @@ bool OgreMeshAsset::SerializeTo(std::vector<u8> &data, const QString &serializat
     }
     return false;
 }
+
+void OgreMeshAsset::ConvertAssimpDataToOgreMesh(const u8 *data_, size_t numBytes)
+{
+
+#ifdef ASSIMP_ENABLED
+    importer = new OpenAssetImport(assetAPI);
+    connect(importer, SIGNAL(ConversionDone(bool)), this, SLOT(OnAssimpConversionDone(bool)), Qt::UniqueConnection);
+    importer->Convert(data_, numBytes, this->Name(), this->DiskSource(), ogreMesh);
+#endif
+}
+
+bool OgreMeshAsset::IsAssimpFileType()
+{
+    const char *openAssImpFileTypes[] = { ".3d", ".b3d", ".blend", ".dae", ".bvh", ".3ds", ".ase", ".obj", ".ply", ".dxf",
+        ".nff", ".smd", ".vta", ".mdl", ".md2", ".md3", ".mdc", ".md5mesh", ".x", ".q3o", ".q3s", ".raw", ".ac",
+        ".stl", ".irrmesh", ".irr", ".off", ".ter", ".mdl", ".hmp", ".ms3d", ".lwo", ".lws", ".lxo", ".csm",
+        ".ply", ".cob", ".scn" };
+
+    int numSuffixes = NUMELEMS(openAssImpFileTypes);
+
+    for(int i = 0;i < numSuffixes; ++i)
+    {
+        if (this->Name().endsWith(openAssImpFileTypes[i]))
+            return true;
+    }
+
+    return false;
+}
+
+#ifdef ASSIMP_ENABLED
+void OgreMeshAsset::OnAssimpConversionDone(bool success)
+{
+    if(success)
+    {
+        if (GenerateMeshData())
+            assetAPI->AssetLoadCompleted(Name());
+	}
+    else
+    {
+        assetAPI->AssetLoadFailed(Name());
+        LogError("OgreMeshAsset::DeserializeFromData: Failed to to covert " + Name() +" to Ogre mesh.");
+    }
+
+    delete importer;
+	
+}
+#endif

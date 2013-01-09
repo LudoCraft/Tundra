@@ -3,6 +3,8 @@
 #pragma once
 
 #include "TundraProtocolModuleFwd.h"
+#include "TundraProtocolModuleApi.h"
+
 #include "SyncState.h"
 #include "SceneFwd.h"
 #include "AttributeChangeType.h"
@@ -22,7 +24,7 @@ namespace TundraLogic
 
     Alternatively, SyncManager and SceneSyncState can be used to implement prioritization logic on how and when
     a sync state is filled per client connection. */
-class SyncManager : public QObject
+class TUNDRAPROTOCOL_MODULE_API SyncManager : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(float updatePeriod READ UpdatePeriod WRITE SetUpdatePeriod) /**< @copydoc updatePeriod_ */

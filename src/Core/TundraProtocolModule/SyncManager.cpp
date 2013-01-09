@@ -12,7 +12,7 @@
 #include "TundraMessages.h"
 #include "MsgEntityAction.h"
 
-#include "Scene.h"
+#include "Scene/Scene.h"
 #include "Entity.h"
 #include "CoreStringUtils.h"
 #include "EC_DynamicComponent.h"
@@ -757,7 +757,7 @@ void SyncManager::ReplicateRigidBodyChanges(kNet::MessageConnection* destination
     {
         const int maxRigidBodyMessageSizeBits = 350; // An update for a single rigid body can take at most this many bits. (conservative bound)
         // If we filled up this message, send it out and start crafting anothero one.
-        if (maxMessageSizeBytes * 8 - ds.BitsFilled() <= maxRigidBodyMessageSizeBits)
+        if (maxMessageSizeBytes * 8 - (int)ds.BitsFilled() <= maxRigidBodyMessageSizeBits)
         {
             destination->EndAndQueueMessage(msg, ds.BytesFilled());
             msg = destination->StartNewMessage(cRigidBodyUpdateMessage, maxMessageSizeBytes);

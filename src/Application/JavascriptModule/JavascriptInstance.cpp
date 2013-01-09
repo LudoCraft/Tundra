@@ -312,21 +312,22 @@ void JavascriptInstance::Run()
     emit ScriptEvaluated();
 }
 
-void JavascriptInstance::RegisterService(QObject *serviceObject, const QString &name)
+bool JavascriptInstance::RegisterService(QObject *serviceObject, const QString &name)
 {
     if (!engine_)
     {
         LogError("JavascriptInstance::RegisterService: No Qt script engine created when trying to register service to js script instance.");
-        return;
+        return false;
     }
     if (!serviceObject)
     {
         LogError("JavascriptInstance::RegisterService: Trying to pass a null service object pointer to RegisterService!");
-        return;
+        return false;
     }
 
     QScriptValue scriptValue = engine_->newQObject(serviceObject);
     engine_->globalObject().setProperty(name, scriptValue);
+    return true;
 }
 
 void JavascriptInstance::IncludeFile(const QString &path)
@@ -374,13 +375,20 @@ void JavascriptInstance::IncludeFile(const QString &path)
         LogError(result.toString());
 }
 
-void JavascriptInstance::ImportExtension(const QString &scriptExtensionName)
+bool JavascriptInstance::ImportExtension(const QString &scriptExtensionName)
 {
+    // Currently QtScriptGenerator extensions are not supported on Android. Attempting to import is a fatal error for the script engine,
+    // so bypass for now 
+#ifdef ANDROID
+    LogWarning("JavascriptInstance::ImportExtension(" + scriptExtensionName + ") failed, script extensions not yet supported on Android");
+    return false;
+#endif
+
     assert(engine_);
     if (!engine_)
     {
         LogWarning("JavascriptInstance::ImportExtension(" + scriptExtensionName + ") failed, QScriptEngine == null!");
-        return;
+        return false;
     }
 
     QStringList qt_extension_whitelist;
@@ -404,13 +412,18 @@ void JavascriptInstance::ImportExtension(const QString &scriptExtensionName)
     if (!trusted_ && !qt_extension_whitelist.contains(scriptExtensionName, Qt::CaseInsensitive))
     {
         LogWarning("JavascriptInstance::ImportExtension: refusing to load a QtScript plugin for an untrusted instance: " + scriptExtensionName);
-        return;
+        return false;
     }
+
+    bool ret = true;
 
     QScriptValue success = engine_->importExtension(scriptExtensionName);
     if (!success.isUndefined()) // Yes, importExtension returns undefinedValue if the import succeeds. http://doc.qt.nokia.com/4.7/qscriptengine.html#importExtension
+    {
         LogWarning("JavascriptInstance::ImportExtension: Failed to load " + scriptExtensionName + " plugin for QtScript!");
-    
+        ret = false;
+    }
+
     if (!trusted_)
     {
         QScriptValue exposed;
@@ -424,6 +437,8 @@ void JavascriptInstance::ImportExtension(const QString &scriptExtensionName)
             }
         }
     }
+
+    return ret;
 }
 
 bool JavascriptInstance::CheckAndPrintException(const QString& message, const QScriptValue& result)

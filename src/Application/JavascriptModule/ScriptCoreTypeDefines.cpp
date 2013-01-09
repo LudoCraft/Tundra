@@ -8,7 +8,7 @@
 #include "EntityReference.h"
 #include "Entity.h"
 #include "ScriptMetaTypeDefines.h"
-#include "Scene.h"
+#include "Scene/Scene.h"
 #include "LoggingFunctions.h"
 #include "QScriptEngineHelpers.h"
 
@@ -21,6 +21,7 @@ Q_DECLARE_METATYPE(IAttribute*)
 Q_DECLARE_METATYPE(ScenePtr)
 Q_DECLARE_METATYPE(EntityPtr)
 Q_DECLARE_METATYPE(ComponentPtr)
+Q_DECLARE_METATYPE(Entity::ComponentVector)
 Q_DECLARE_METATYPE(QList<Entity*>)
 Q_DECLARE_METATYPE(QList<QObject*>)
 Q_DECLARE_METATYPE(Entity*)
@@ -336,6 +337,30 @@ QScriptValue toScriptValueComponentMap(QScriptEngine *engine, const Entity::Comp
     return obj;
 }
 
+void fromScriptValueComponentVector(const QScriptValue &/*obj*/, Entity::ComponentVector &/*components*/)
+{
+    // Left empty deliberately, since we do not have need of conversion from QScriptValue to component vector
+}
+
+QScriptValue toScriptValueComponentVector(QScriptEngine *engine, const Entity::ComponentVector &components)
+{
+    QScriptValue obj = engine->newArray();
+    Entity::ComponentVector::const_iterator iter = components.begin();
+    quint32 i = 0;
+    while(iter != components.end())
+    {
+        ComponentPtr comp = (*iter);
+        if (comp.get())
+        {
+            obj.setProperty(i, engine->newQObject(comp.get()));
+            i++;
+        }
+        ++iter;
+    }
+
+    return obj;
+}
+
 void fromScriptValueComponentMap(const QScriptValue &obj, Entity::ComponentMap &components)
 {
     components.clear();
@@ -363,8 +388,9 @@ QScriptValue toScriptValueStdString(QScriptEngine *engine, const std::string &s)
     return engine->newVariant(QString::fromStdString(s));
 }
 
-void fromScriptValueIAttribute(const QScriptValue &obj, IAttribute *&s)
+void fromScriptValueIAttribute(const QScriptValue & /*obj*/, IAttribute *& /*s*/)
 {
+    // Left empty deliberately, since we do not have need of conversion from QScriptValue to IAttribute
 }
 
 QScriptValue createColor(QScriptContext *ctx, QScriptEngine *engine)
@@ -441,6 +467,7 @@ void RegisterCoreMetaTypes()
     qRegisterMetaType<EntityList>("EntityList");
     qRegisterMetaType<Scene::EntityMap>("EntityMap");
     qRegisterMetaType<Entity::ComponentMap>("ComponentMap");
+    qRegisterMetaType<Entity::ComponentVector>("ComponentVector");
     qRegisterMetaType<std::string>("std::string");
 }
 
@@ -462,6 +489,7 @@ void ExposeCoreTypes(QScriptEngine *engine)
     qScriptRegisterMetaType<EntityList>(engine, toScriptValueEntityStdList, fromScriptValueEntityStdList);
     qScriptRegisterMetaType<Scene::EntityMap>(engine, toScriptValueEntityMap, fromScriptValueEntityMap);
     qScriptRegisterMetaType<Entity::ComponentMap>(engine, toScriptValueComponentMap, fromScriptValueComponentMap);
+    qScriptRegisterMetaType<Entity::ComponentVector>(engine, toScriptValueComponentVector, fromScriptValueComponentVector);
     qScriptRegisterMetaType<std::string>(engine, toScriptValueStdString, fromScriptValueStdString);
 
     // Register constructors

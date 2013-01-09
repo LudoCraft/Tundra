@@ -6,21 +6,29 @@
 if (NOT WIN32 AND NOT APPLE)
 # TODO: Remove configure_ogre and replace it with a use_package_ogre() and link_package_ogre()
 macro(configure_ogre)
-  find_path(OGRE_LIBRARY_DIR NAMES lib/libOgreMain.so
-    HINTS ${ENV_OGRE_HOME} ${ENV_NAALI_DEP_PATH})
 
-  find_path(OGRE_INCLUDE_DIR Ogre.h
-    HINTS ${ENV_OGRE_HOME}/include ${ENV_NAALI_DEP_PATH}/include
-    PATH_SUFFIXES OGRE)
+  # Android uses static Ogre, include all used plugins and their include directories
+  if (NOT ANDROID)
+      find_path(OGRE_INCLUDE_DIR Ogre.h
+        HINTS ${ENV_OGRE_HOME}/include ${ENV_NAALI_DEP_PATH}/include
+        PATH_SUFFIXES OGRE)
 
-  find_library(OGRE_LIBRARY OgreMain
-    HINTS ${ENV_OGRE_HOME}/lib ${ENV_NAALI_DEP_PATH}/lib)
+      find_path(OGRE_LIBRARY_DIR NAMES libOgreMain.so
+        HINTS ${ENV_OGRE_HOME} ${ENV_NAALI_DEP_PATH})
+      find_library(OGRE_LIBRARY OgreMain
+        HINTS ${ENV_OGRE_HOME}/lib ${ENV_NAALI_DEP_PATH}/lib)
 
-  include_directories(${OGRE_INCLUDE_DIR})
-  link_directories(${OGRE_LIBRARY_DIR})
-
+      include_directories(${OGRE_INCLUDE_DIR})
+      link_directories(${OGRE_LIBRARY_DIR})
+  else()
+      set (OGRE_LIBRARY_DIR ${ENV_OGRE_HOME}/lib ${ENV_OGRE_HOME}/AndroidDependencies/lib)
+      set (OGRE_LIBRARY OgreOverlayStatic Plugin_OctreeSceneManagerStatic OgreRTShaderSystemStatic Plugin_ParticleFXStatic RenderSystem_GLES2Static OgreMainStatic freeimage freetype stdc++ supc++ z zziplib cpu-features EGL GLESv1_CM GLESv2 android)
+      include_directories(${ENV_OGRE_HOME}/include ${ENV_OGRE_HOME}/OgreMain/include ${ENV_OGRE_HOME}/Components/Overlay/include ${ENV_OGRE_HOME}/Components/RTShaderSystem/include  
+        ${ENV_OGRE_HOME}/RenderSystems/GLES2/include ${ENV_OGRE_HOME}/PlugIns/OctreeSceneManager/include ${ENV_OGRE_HOME}/PlugIns/ParticleFX/include)
+      link_directories(${OGRE_LIBRARY_DIR})
+  endif()
 endmacro()
-    
+
 else() # Windows Ogre lookup.
 
 # TODO: Remove configure_ogre and replace it with a use_package_ogre() and link_package_ogre()
@@ -30,16 +38,18 @@ macro(configure_ogre)
         configure_directx()
         link_directx()
     else()
-        message(STATUS "DirectX disabled from the build")
+        message(STATUS "DirectX disabled from the build\n")
     endif()
 
     # Ogre lookup rules:
     # 1. Use the predefined OGRE_DIR CMake variable if it was set.
-    # 2. Otherwise, use the OGRE_HOME environment variable if it was set.
+    # 2. Otherwise, use the OGRE_HOME environment variable if it was set  and cache it as OGRE_DIR.
     # 3. Otherwise, use Ogre from Tundra deps directory.
 
     if ("${OGRE_DIR}" STREQUAL "")
-        set(OGRE_DIR $ENV{OGRE_HOME})
+        file (TO_CMAKE_PATH "$ENV{OGRE_HOME}" OGRE_DIR)
+        # Cache OGRE_DIR for runs that dont define $ENV{OGRE_HOME}.
+        set (OGRE_DIR ${OGRE_DIR} CACHE PATH "OGRE_HOME dependency path" FORCE)
     endif()
 
     # On Apple, Ogre comes in the form of a Framework. The user has to have this manually installed.
@@ -48,7 +58,7 @@ macro(configure_ogre)
             find_library(OGRE_LIBRARY Ogre)
             set(OGRE_DIR ${OGRE_LIBRARY})
         else()
- #           set(OGRE_DIR ${OGRE_DIR}/lib/Ogre.framework) # User specified custom Ogre directory pointing to Ogre Hg trunk directory.
+            #set(OGRE_DIR ${OGRE_DIR}/lib/Ogre.framework) # User specified custom Ogre directory pointing to Ogre Hg trunk directory.
             set(OGRE_BUILD_CONFIG "relwithdebinfo") # TODO: We would like to link to debug in debug mode, release in release etc, not always fixed to this.
             set(OGRE_LIBRARY ${OGRE_DIR}/lib/relwithdebinfo/Ogre.framework)
         endif()
@@ -68,6 +78,8 @@ macro(configure_ogre)
     # 2. If you are using an installed Ogre SDK, OGRE_DIR can point to the SDK root directory.
     # We want to support both so that one can do active development on the Ogre Hg repository, without
     # having to always do the intermediate SDK installation/deployment step.
+    
+    message("** Configuring Ogre")
     
     if (APPLE)# AND IS_DIRECTORY ${OGRE_DIR}/Headers) # OGRE_DIR points to a manually installed Ogre.framework?
         if (IS_DIRECTORY ${OGRE_DIR}/lib)
@@ -99,14 +111,20 @@ macro(configure_ogre)
     else()
         message(FATAL_ERROR "When looking for Ogre, the path ${OGRE_DIR} does not point to a valid Ogre directory!")
     endif()
+    message("")
 endmacro()
 
 endif()
 
 macro(link_ogre)
     if (WIN32)
-        target_link_libraries(${TARGET_NAME} debug OgreMain_d debug RenderSystem_Direct3D9_d)
-        target_link_libraries(${TARGET_NAME} optimized OgreMain optimized RenderSystem_Direct3D9)
+        if (ENABLE_DIRECTX)
+            target_link_libraries(${TARGET_NAME} debug OgreMain_d debug RenderSystem_Direct3D9_d)
+            target_link_libraries(${TARGET_NAME} optimized OgreMain optimized RenderSystem_Direct3D9)
+        else()
+            target_link_libraries(${TARGET_NAME} debug OgreMain_d)
+            target_link_libraries(${TARGET_NAME} optimized OgreMain)
+        endif()
     else()
         target_link_libraries(${TARGET_NAME} ${OGRE_LIBRARY})
     endif()

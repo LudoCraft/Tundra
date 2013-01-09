@@ -3,7 +3,7 @@
 #include "StableHeaders.h"
 #include "SyncState.h"
 
-#include "Scene.h"
+#include "Scene/Scene.h"
 #include "Entity.h"
 #include "IComponent.h"
 #include "Profiler.h"
@@ -13,7 +13,7 @@
 const float EntitySyncState::minUpdateRate = 5.f; //0.5f;
 const float EntitySyncState::maxUpdateRate = 0.005f;
 
-SceneSyncState::SceneSyncState(int userConnectionID, bool isServer) :
+SceneSyncState::SceneSyncState(u32 userConnectionID, bool isServer) :
     userConnectionID_(userConnectionID),
     changeRequest_(userConnectionID),
     isServer_(isServer),

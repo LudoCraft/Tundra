@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "TundraProtocolModuleApi.h"
+
 #include "CoreTypes.h"
 #include "SceneFwd.h"
 #include "Transform.h"
@@ -222,16 +224,16 @@ struct RigidBodyInterpolationState
 };
 
 /// State change request to permit/deny changes.
-class StateChangeRequest : public QObject
+class TUNDRAPROTOCOL_MODULE_API StateChangeRequest : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(bool accepted READ Accepted WRITE SetAccepted)
-    Q_PROPERTY(int connectionID READ ConnectionID)
+    Q_PROPERTY(u32 connectionID READ ConnectionID)
     Q_PROPERTY(entity_id_t entityId READ EntityId)
     Q_PROPERTY(Entity* entity READ GetEntity)
 
 public:
-    StateChangeRequest(int connectionID) :
+    StateChangeRequest(u32 connectionID) :
         connectionID_(connectionID)
     {
         Reset();
@@ -257,26 +259,25 @@ public slots:
 public:
     bool Accepted() const { return accepted_; }
     bool Rejected() const { return !accepted_; }
-    int ConnectionID()const { return connectionID_; }
+    u32 ConnectionID()const { return connectionID_; }
     entity_id_t EntityId() const { return entityId_; }
     Entity* GetEntity() const { return entity_; }
     void SetEntity(Entity* entity) { entity_ = entity; }
 
 private:
     bool accepted_;
-    int connectionID_;
+    u32 connectionID_;
     entity_id_t entityId_;
     Entity* entity_;
 };
 
 /// Scene's per-user network sync state
 /* @sa ComponentSyncState, EntitySyncState */
-class SceneSyncState : public QObject
-{
-    Q_OBJECT
+class TUNDRAPROTOCOL_MODULE_API SceneSyncState : public QObject
+{    Q_OBJECT
 
 public:
-    SceneSyncState(int userConnectionID = 0, bool isServer = false);
+    SceneSyncState(u32 userConnectionID = 0, bool isServer = false);
     virtual ~SceneSyncState();
 
     /// Dirty entities pending processing
@@ -381,7 +382,7 @@ private:
 
     StateChangeRequest changeRequest_;
     bool isServer_;
-    int userConnectionID_;
+    u32 userConnectionID_;
 
     SceneWeakPtr scene_;
 };
