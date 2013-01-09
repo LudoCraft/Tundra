@@ -45,7 +45,7 @@ kNet::MessageConnection* currentSender = 0;
 /// Compares EntitySyncStates by priority and relevancy.
 bool EntitySyncStatePriorityLessThan(const EntitySyncState *lhs, const EntitySyncState *rhs)
 {
-    return lhs->priority * lhs->relevancy < rhs->priority * rhs->relevancy;
+    return lhs->FinalPriority() < rhs->FinalPriority();
 }
 
 namespace TundraLogic
@@ -716,11 +716,15 @@ void SyncManager::Update(f64 frametime)
         for(UserConnectionList::iterator i = users.begin(); i != users.end(); ++i)
             if ((*i)->syncState)
             {
-                // First send out all changes to rigid bodies, if IM not enabled.
-                // After processing this function, the bits related to rigid body states have been cleared,
+                // First sort the dirty queue according to priority if IM enabled
+                if (interestManagementEnabled)
+                {
+                    PROFILE(SyncManager_Update_SortDirtyQueue);
+                    (*i)->syncState->dirtyQueue.sort(EntitySyncStatePriorityLessThan);
+                }
+                // Process rigid bodies first. After processing this function, the bits related to rigid body states have been cleared,
                 // so the generic sync will not double-replicate the rigid body positions and velocities.
-                if (!interestManagementEnabled)
-                    ReplicateRigidBodyChanges((*i)->connection, (*i)->syncState.get());
+                ReplicateRigidBodyChanges((*i)->connection, (*i)->syncState.get());
                 // Then send out changes to other attributes via the generic sync mechanism.
                 ProcessSyncState((*i)->connection, (*i)->syncState.get());
             }
@@ -763,8 +767,8 @@ void SyncManager::ReplicateRigidBodyChanges(kNet::MessageConnection* destination
             msg = destination->StartNewMessage(cRigidBodyUpdateMessage, maxMessageSizeBytes);
             ds = kNet::DataSerializer(msg->data, maxMessageSizeBytes);
         }
-        EntitySyncState &ess = **iter;
 
+        EntitySyncState &ess = **iter;
         if (ess.isNew || ess.removed)
             continue; // Newly created and removed entities are handled through the traditional sync mechanism.
 
@@ -781,7 +785,7 @@ void SyncManager::ReplicateRigidBodyChanges(kNet::MessageConnection* destination
             ComponentSyncState &pss = placeableComp->second;
             if (!pss.isNew && !pss.removed) // Newly created and deleted components are handled through the traditional sync mechanism.
             {
-                transformDirty = (pss.dirtyAttributes[0] & 1) != 0; // The Transform of an EC_Placeable is the first attibute in the component.
+                transformDirty = (pss.dirtyAttributes[0] & 1) != 0; // The Transform of an EC_Placeable is the first attribute in the component.
                 pss.dirtyAttributes[0] &= ~1;
             }
         }
@@ -825,10 +829,13 @@ void SyncManager::ReplicateRigidBodyChanges(kNet::MessageConnection* destination
         if (!transformDirty && !velocityDirty && !angularVelocityDirty)
             continue;
 
-        const Transform &t = placeable->transform.Get();
-
         float timeSinceLastSend = kNet::Clock::SecondsSinceF(ess.lastNetworkSendTime);
+        /// @todo Is this the best place for this check?
+        if (interestManagementEnabled && timeSinceLastSend < ess.ComputePrioritizedUpdateInterval(updatePeriod_))
+            continue;
+
         const float3 predictedClientSidePosition = ess.transform.pos + timeSinceLastSend * ess.linearVelocity;
+        const Transform &t = placeable->transform.Get();
         float error = t.pos.DistanceSq(predictedClientSidePosition);
         UNREFERENCED_PARAM(error)
         // TEST: To have the server estimate how far the client has simulated, use this.
@@ -897,7 +904,7 @@ void SyncManager::ReplicateRigidBodyChanges(kNet::MessageConnection* destination
             ds.Add<float>(t.pos.x);
             ds.Add<float>(t.pos.y);
             ds.Add<float>(t.pos.z);
-        }        
+        }
 
         if (rotSendType == 1) // Orientation with 1 DOF, only yaw.
         {
@@ -1178,9 +1185,6 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
     // Interest management sync priorization performed only on the server
     bool serverImEnabled = (owner_->IsServer() && interestManagementEnabled);
 
-    if (serverImEnabled) // Sort according to priority
-        state->dirtyQueue.sort(EntitySyncStatePriorityLessThan);
-
     // Process the state's dirty entity queue.
     std::list<EntitySyncState*>::iterator it = state->dirtyQueue.begin();
     while(it != state->dirtyQueue.end())
@@ -1188,10 +1192,8 @@ void SyncManager::ProcessSyncState(kNet::MessageConnection* destination, SceneSy
         EntitySyncState& entityState = **it;
         // See if we need to sync yet.
         float timeSinceLastSend = kNet::Clock::SecondsSinceF(entityState.lastNetworkSendTime);
-        if (serverImEnabled && timeSinceLastSend < entityState.PrioritizedUpdateInterval())
+        if (serverImEnabled && timeSinceLastSend < entityState.ComputePrioritizedUpdateInterval(updatePeriod_))
         {
-            //UserConnectionPtr user = owner_->GetKristalliModule()->GetUserConnection(destination);
-            //LogDebug(QString("Skipping sending %1 to user %2 updateInterval %3").arg(entityState.id).arg((user ? user->ConnectionId() : 666)).arg(entityState.PrioritizedUpdateInterval()));
             ++it;
             continue;
         }
@@ -2191,9 +2193,8 @@ void SyncManager::HandleCreateEntityReply(kNet::MessageConnection* source, const
         LogWarning("Null scene or sync state, disregarding CreateEntityReply message");
         return;
     }
-    
-    bool isServer = owner_->IsServer();
-    if (isServer)
+
+    if (owner_->IsServer())
     {
         LogWarning("Discarding CreateEntityReply message on server");
         return;
@@ -2251,9 +2252,8 @@ void SyncManager::HandleCreateComponentsReply(kNet::MessageConnection* source, c
         LogWarning("Null scene or sync state, disregarding CreateComponentsReply message");
         return;
     }
-    
-    bool isServer = owner_->IsServer();
-    if (isServer)
+
+    if (owner_->IsServer())
     {
         LogWarning("Discarding CreateComponentsReply message on server");
         return;
@@ -2411,7 +2411,7 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
 
     boost::shared_ptr<EC_Placeable> placeable = entity->GetComponent<EC_Placeable>();
     boost::shared_ptr<EC_Mesh> mesh = entity->GetComponent<EC_Mesh>();
-//    boost::shared_ptr<EC_RigidBody> rigidBody = entity->GetComponent<EC_RigidBody>();
+    boost::shared_ptr<EC_RigidBody> rigidBody = entity->GetComponent<EC_RigidBody>();
     /// @todo handle audio sources
 /*
 #ifdef EC_Sound_ENABLED
@@ -2446,9 +2446,6 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
     }
     else if (placeable && mesh)
     {
-        /// @todo Take direction and velocity of rigid bodies into account
-        //if (rigibBody)
-
         OBB worldObb;
         if (framework_->IsHeadless())
         {
@@ -2469,11 +2466,12 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
 //        LogDebug(QString("%1 sizeSq %2 distanceSq %3").arg(entity->ToString()).arg(sizeSq).arg(distanceSq));
     }
 
-    /// @todo Hardcoded relevancy of 10 for entities with Avatar component and 1 for others for now.
-    entityState->relevancy = entity->GetComponent("EC_Avatar") ? 10.f : 1.f;
-//    if (entity->GetComponent("EC_Avatar"))//!EqualAbs(oldPrio, entityState->ComputePrioritizedUpdateInterval()))
-//    LogDebug(QString("IM: %1 prio %2 rel %3 prio*rel %4 updateInterval %5").arg(entity->ToString()).arg(
-//        entityState->priority).arg(entityState->relevancy).arg(entityState->FinalPriority()).arg(entityState->ComputePrioritizedUpdateInterval(updatePeriod_)));
+    /// @todo Take direction and velocity of rigid bodies into account
+        //if (rigibBody)
+    /// @todo Hardcoded relevancy of 10 for entities with RigidBody component and 1 for others for now.
+    entityState->relevancy = rigidBody /*entity->GetComponent("EC_Avatar")*/ ? 10.f : 1.f;
+    LogDebug(QString("%1 P %2 R %3 P*R %4 syncRate %5").arg(entity->ToString()).arg(
+        entityState->priority).arg(entityState->relevancy).arg(entityState->FinalPriority()).arg(entityState->ComputePrioritizedUpdateInterval(updatePeriod_)));
 }
 
 void SyncManager::ComputePrioritiesForEntitySyncStates(SceneSyncState *sceneState) const

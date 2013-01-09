@@ -160,12 +160,16 @@ struct EntitySyncState
             avgUpdateInterval = 0.5 * time + 0.5 * avgUpdateInterval;
     }
 
-    /// Prioritized network update interval in seconds.
-    /* @remark Interest management */
-    float PrioritizedUpdateInterval() const { return Clamp(1.f / (priority * relevancy), maxUpdateRate, minUpdateRate); }
+    /// Computes prioritized network update interval in seconds.
+    /*  @remark Interest management */
+    float ComputePrioritizedUpdateInterval(float maxUpdateRate) const { return Clamp(maxUpdateRate / FinalPriority(), maxUpdateRate, minUpdateRate); }
+
+    /// Returns final/combined priority of this sync state.
+    /*  @remark Interest management */
+    float FinalPriority() const { return priority * relevancy; }
 
     static const float minUpdateRate; ///< 5 (in seconds)
-    static const float maxUpdateRate; ///< 0.005 (in seconds)
+//    static const float maxUpdateRate; ///< 0.005 (in seconds)
 
     std::list<ComponentSyncState*> dirtyQueue; ///< Dirty components
     std::map<component_id_t, ComponentSyncState> components; ///< Component syncstates
