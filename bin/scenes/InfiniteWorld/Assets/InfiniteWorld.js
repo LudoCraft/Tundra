@@ -50,20 +50,20 @@ if (server.IsRunning())
     console.RegisterCommand("setImEnabled", "Sets interest management enabled or disabled").Invoked.connect(SetInterestManagementEnabled);
     console.RegisterCommand("setPhysicsMotorEnabled", "Sets usage of PhysicsMotor enabled or disabled").Invoked.connect(SetPhysicsMotorEnabled);
 
-    // numRows and numCols must be uneven and >= 3: 3,5,7,9,...
-    const numRows = numCols = 3;
+    // cNumRows and cNumCols must be uneven and >= 3: 3,5,7,9,...
+    const cNumRows = cNumCols = 3;
 
     // Start point of the scene block matrix.
-    var startPos = new float3(0, 0, 0);
-    // NOTE: numPatches configurable only if .ntf is also re-authored.
-    const numPatches = 8;
-    const blockWidth = 16 * numPatches - 1;
-    const blockHeight = 128;
+    const cStartPos = new float3(0, 0, 0);
+    // NOTE: cNumPatches configurable only if .ntf is also re-authored.
+    const cNumPatches = 8;
+    const cBlockWidth = 16 * cNumPatches - 1;
+    const cBlockHeight = 128;
 
     // Init the scene block matrix
-    var sceneBlocks = new Array(numRows);
-    for(var i = 0; i < numRows; ++i)
-        sceneBlocks[i] = new Array(numCols);
+    var sceneBlocks = new Array(cNumRows);
+    for(var i = 0; i < cNumRows; ++i)
+        sceneBlocks[i] = new Array(cNumCols);
 
     var userEntity = null;
     var previousBlock = null;
@@ -91,7 +91,7 @@ function SceneBlock(name, row, col, pos)
     this.pos = pos;
     this.entities = [];
     this.bots = [];
-    this.aabb = new AABB(pos, new float3(pos.x + blockWidth, blockHeight, pos.z + blockWidth));
+    this.aabb = new AABB(pos, new float3(pos.x + cBlockWidth, cBlockHeight, pos.z + cBlockWidth));
 }
 
 SceneBlock.prototype.toString = function()
@@ -115,8 +115,8 @@ function Stop()
 {
     if (server.IsRunning())
     {
-        for(var i = 0; i < numRows; ++i)
-            for(var j = 0; j < numCols; ++j)
+        for(var i = 0; i < cNumRows; ++i)
+            for(var j = 0; j < cNumCols; ++j)
                 RemoveSceneBlockAt(i, j/*,false*/);
         sceneBlocks = null;
     }
@@ -133,9 +133,9 @@ function HandleUserConnected(id, user)
         var userStartPos;
         // TODO: if known user, restore last known position for the user
         // else set to center of the scene
-        var pos = new float3(startPos);
-        for(var i = 0; i < numRows; ++i)
-            for(var j = 0; j < numCols; ++j)
+        var pos = new float3(cStartPos);
+        for(var i = 0; i < cNumRows; ++i)
+            for(var j = 0; j < cNumCols; ++j)
             {
                 var block = InstantiateSceneBlock(pos, i, j);
                 sceneBlocks[i][j] = block;
@@ -143,21 +143,21 @@ function HandleUserConnected(id, user)
                 if (block == CenterBlock())
                     userStartPos = new float3(pos);
 
-                if (j == numCols-1) // Reached end of the row, proceed to next
+                if (j == cNumCols-1) // Reached end of the row, proceed to next
                 {
-                    pos.x = startPos.x;
-                    pos.z += blockWidth; // backwards +z
+                    pos.x = cStartPos.x;
+                    pos.z += cBlockWidth; // backwards +z
                 }
                 else // Proceed with the row.
                 {
-                    pos.x += blockWidth; // right +x
+                    pos.x += cBlockWidth; // right +x
                 }
             }
 
         // Position user in the middle of the middle block, add some height so that we don't end up under the terrain.
-        userStartPos.x += blockWidth/2;
+        userStartPos.x += cBlockWidth/2;
         userStartPos.y += 40;
-        userStartPos.z += blockWidth/2;
+        userStartPos.z += cBlockWidth/2;
         userEntity.placeable.SetPosition(userStartPos);
         userEntity.placeable.SetOrientation(Quat.FromEulerZYX(0,0,0));
 
@@ -207,7 +207,7 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
     entities[0].name = "Terrain" + blockName;
 
     // TODO aabb copied from SceneBlock ctor
-    var aabb = new AABB(pos, new float3(pos.x + blockWidth, blockHeight, pos.z + blockWidth));
+    var aabb = new AABB(pos, new float3(pos.x + cBlockWidth, cBlockHeight, pos.z + cBlockWidth));
 //    var botPrefab = asset.GetAsset("FireEaterBot.txml").DiskSource();
     var botPrefab = asset.GetAsset("WaypointBot.txml").DiskSource();
     const numBots = 6;
@@ -228,11 +228,11 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
         for(i = 1; i < entities.length; ++i)
         {
             var fireEaterPos = new float3(pos);
-            fireEaterPos.x += blockWidth/2;
+            fireEaterPos.x += cBlockWidth/2;
             //fireEaterPos.y += 40;
             fireEaterPos.y = entities[0].terrain.GetPoint(pos.x, pos.z) + 1;
             Log(fireEaterPos);
-            fireEaterPos.z += blockWidth/2;
+            fireEaterPos.z += cBlockWidth/2;
             entities[1].placeable.SetPosition(fireEaterPos);
         }
     }
@@ -295,7 +295,7 @@ function DebugDumpSceneBlocks()
         for(var j = 0; j < sceneBlocks[i].length; ++j)
         {
             str += "[" + sceneBlocks[i][j].name + "]";
-            if (j == numCols-1 && i < numRows-1)
+            if (j == cNumCols-1 && i < cNumRows-1)
                 str += "\n";
             else
                 str += " ";
@@ -304,15 +304,15 @@ function DebugDumpSceneBlocks()
 }
 
 // Shortcuts
-function CenterBlock() { return sceneBlocks[(numRows-1)/2][(numCols-1)/2]; }
-function TopRightBlock() { return sceneBlocks[0][numCols-1]; }
+function CenterBlock() { return sceneBlocks[(cNumRows-1)/2][(cNumCols-1)/2]; }
+function TopRightBlock() { return sceneBlocks[0][cNumCols-1]; }
 function TopLeftBlock() { return sceneBlocks[0][0]; }
-function BottomLeftBlock() { return sceneBlocks[numRows-1][0]; }
-function BottomRightBlock() { return sceneBlocks[numRows-1][numCols-1]; }
-function BottomCenterBlock() { return sceneBlocks[numRows-1][(numCols-1)/2]; }
-function CenterRightBlock() { return sceneBlocks[(numRows-1)/2][numCols-1]; }
-function TopCenterBlock() { return sceneBlocks[0][(numCols-1)/2]; }
-function CenterLeftBlock() { return sceneBlocks[(numRows-1)/2][0]; }
+function BottomLeftBlock() { return sceneBlocks[cNumRows-1][0]; }
+function BottomRightBlock() { return sceneBlocks[cNumRows-1][cNumCols-1]; }
+function BottomCenterBlock() { return sceneBlocks[cNumRows-1][(cNumCols-1)/2]; }
+function CenterRightBlock() { return sceneBlocks[(cNumRows-1)/2][cNumCols-1]; }
+function TopCenterBlock() { return sceneBlocks[0][(cNumCols-1)/2]; }
+function CenterLeftBlock() { return sceneBlocks[(cNumRows-1)/2][0]; }
 
 var timer = 0;
 var checkInterval = 2; // in seconds
@@ -361,13 +361,13 @@ function Update(frameTime)
             Log("MOVING RIGHT");
 
             var pos = new float3(TopRightBlock().aabb.minPoint);
-            pos.x += deltaCol * blockWidth;
+            pos.x += deltaCol * cBlockWidth;
 
             // Instantiate new blocks
-            for(var i = 0, row = currentBlock.row-1; i < numRows; ++i, ++row)
+            for(var i = 0, row = currentBlock.row-1; i < cNumRows; ++i, ++row)
             {
                 newBlocks.push(InstantiateSceneBlock(pos, row, currentBlock.col+deltaCol)); // +1
-                pos.z += blockWidth; // backwards +z
+                pos.z += cBlockWidth; // backwards +z
             }
 
             // Gather blocks to be removed.
@@ -376,15 +376,15 @@ function Update(frameTime)
 
             // Re-arrange the scene block matrix.
             // Move columns left, excluding the last column
-            for(var col = 0; col < numCols-1; ++col)
-                for(var i = 0; i < numRows; ++i)
+            for(var col = 0; col < cNumCols-1; ++col)
+                for(var i = 0; i < cNumRows; ++i)
                     sceneBlocks[i][col] = sceneBlocks[i][col+1];
 
             RemoveSceneBlocks(oldBlocks);
 
             // Add new blocks to the scene block matrix
             for(var i = 0; i < newBlocks.length; ++i)
-                sceneBlocks[i][numCols-1] = newBlocks[i];
+                sceneBlocks[i][cNumCols-1] = newBlocks[i];
         }
         else if (deltaRow == 0 && deltaCol < 0) // Moving left
         {
@@ -392,22 +392,22 @@ function Update(frameTime)
             Log("MOVING LEFT");
 
             var pos = new float3(TopLeftBlock().aabb.minPoint);
-            pos.x += deltaCol * blockWidth;
+            pos.x += deltaCol * cBlockWidth;
 
             // Instantiate new blocks
-            for(var i = 0, row = currentBlock.row-1; i < numRows; ++i, ++row)
+            for(var i = 0, row = currentBlock.row-1; i < cNumRows; ++i, ++row)
             {
                 newBlocks.push(InstantiateSceneBlock(pos, row, currentBlock.col+deltaCol)); //-1
-                pos.z += blockWidth;
+                pos.z += cBlockWidth;
             }
             // Gather blocks to be removed.
             for(var i = 0; i < newBlocks.length; ++i)
-                oldBlocks.push(sceneBlocks[i][numCols-1]);
+                oldBlocks.push(sceneBlocks[i][cNumCols-1]);
 
             // Re-arrange the scene block matrix.
             // Move columns right, excluding the first column
-            for(var col = numCols-1; col > 0; --col)
-                for(var i = 0; i < numRows; ++i)
+            for(var col = cNumCols-1; col > 0; --col)
+                for(var i = 0; i < cNumRows; ++i)
                     sceneBlocks[i][col] = sceneBlocks[i][col-1];
 
             RemoveSceneBlocks(oldBlocks);
@@ -422,13 +422,13 @@ function Update(frameTime)
             Log("MOVING DOWN");
 
             var pos = new float3(BottomLeftBlock().aabb.minPoint);
-            pos.z += deltaRow * blockWidth;
+            pos.z += deltaRow * cBlockWidth;
 
             // Instantiate new blocks
-            for(var j = 0, col = BottomLeftBlock().col; j < numCols; ++j, ++col)
+            for(var j = 0, col = BottomLeftBlock().col; j < cNumCols; ++j, ++col)
             {
                 newBlocks.push(InstantiateSceneBlock(pos, currentBlock.row+deltaRow, col)); // +1
-                pos.x += blockWidth;
+                pos.x += cBlockWidth;
             }
 
             // Gather blocks to be removed (first row)
@@ -437,15 +437,15 @@ function Update(frameTime)
 
             // Re-arrange the scene block matrix.
             // Row 1 becomes row 0, row 2 becomes row 1 etc.
-            for(var row = 0; row < numRows-1; ++row)
-                for(var j = 0; j < numCols; ++j)
+            for(var row = 0; row < cNumRows-1; ++row)
+                for(var j = 0; j < cNumCols; ++j)
                     sceneBlocks[row][j] = sceneBlocks[row+1][j];
 
             RemoveSceneBlocks(oldBlocks);
 
             // Add new blocks to the scene block matrix
             for(var j = 0; j < newBlocks.length; ++j)
-                sceneBlocks[numRows-1][j] = newBlocks[j];
+                sceneBlocks[cNumRows-1][j] = newBlocks[j];
         }
         else if (deltaRow < 0  && deltaCol == 0) // Moving forward/"up"
         {
@@ -453,23 +453,23 @@ function Update(frameTime)
             Log("MOVING UP");
 
             var pos = new float3(TopLeftBlock().aabb.minPoint);
-            pos.z += deltaRow * blockWidth;
+            pos.z += deltaRow * cBlockWidth;
 
             // Instantiate new blocks
-            for(var j = 0, col = TopLeftBlock().col; j < numCols; ++j, ++col)
+            for(var j = 0, col = TopLeftBlock().col; j < cNumCols; ++j, ++col)
             {
                 newBlocks.push(InstantiateSceneBlock(pos, currentBlock.row+deltaRow, col)); // -1
-                pos.x += blockWidth;
+                pos.x += cBlockWidth;
             }
 
             // Gather blocks to be removed (bottom row)
             for(var j = 0; j < newBlocks.length; ++j)
-                oldBlocks.push(sceneBlocks[numRows-1][j]);
+                oldBlocks.push(sceneBlocks[cNumRows-1][j]);
 
             // Re-arrange the scene block matrix.
             // Row 1 becomes row 2, row 0 becomes row 1 etc.
-            for(var row = numRows-1; row > 0; --row)
-                for(var j = 0; j < numCols; ++j)
+            for(var row = cNumRows-1; row > 0; --row)
+                for(var j = 0; j < cNumCols; ++j)
                     sceneBlocks[row][j] = sceneBlocks[row-1][j];
 
             RemoveSceneBlocks(oldBlocks);
@@ -483,82 +483,82 @@ function Update(frameTime)
             // Append new column and new row, remove leftmost column and topmost row.
             Log("MOVING RIGHT AND DOWN");
             var pos = new float3(CenterRightBlock().aabb.minPoint);
-            pos.x += deltaCol * blockWidth;
+            pos.x += deltaCol * cBlockWidth;
 
             // Instantiate new blocks
-            for(var i = 0, row = currentBlock.row-1; i < numRows; ++i, ++row)
+            for(var i = 0, row = currentBlock.row-1; i < cNumRows; ++i, ++row)
             {
                 newBlocks.push(InstantiateSceneBlock(pos, row, currentBlock.col+deltaCol)); // +1
-                pos.z += blockWidth; // backwards +z
+                pos.z += cBlockWidth; // backwards +z
             }
             // One step back to both dirs, instantiate row from right to left
-            pos.z -= blockWidth;
-            pos.x -= blockWidth;
-            for(var j = 0, col = currentBlock.col; j < numCols-1; ++j, --col) // bottom right is already instantiated
+            pos.z -= cBlockWidth;
+            pos.x -= cBlockWidth;
+            for(var j = 0, col = currentBlock.col; j < cNumCols-1; ++j, --col) // bottom right is already instantiated
             {
                 newBlocks.push(InstantiateSceneBlock(pos, currentBlock.row+deltaRow, col)); // +1
-                pos.x -= blockWidth;
+                pos.x -= cBlockWidth;
             }
 
             // Gather blocks to be removed.
-            for(var i = 0; i < numRows; ++i) // Leftmost column
+            for(var i = 0; i < cNumRows; ++i) // Leftmost column
                 oldBlocks.push(sceneBlocks[i][0]);
-            for(var j = 1; j < numCols; ++j) // Top row, skip top-left block j=0, as it's already included
+            for(var j = 1; j < cNumCols; ++j) // Top row, skip top-left block j=0, as it's already included
                 oldBlocks.push(sceneBlocks[0][j]);
 
             // Re-arrange the scene block matrix: move each element left and up
-            for(var i = 0; i < numRows-1; ++i)
-                for(var j = 0; j < numCols-1; ++j)
+            for(var i = 0; i < cNumRows-1; ++i)
+                for(var j = 0; j < cNumCols-1; ++j)
                     sceneBlocks[i][j] = sceneBlocks[i+1][j+1];
 
             RemoveSceneBlocks(oldBlocks);
 
             // Add new blocks to the scene block matrix
             var idx = 0;
-            for(var i = 0; idx < numRows; ++idx, ++i)
-                sceneBlocks[i][numCols-1] = newBlocks[idx];
-            for(var j = numCols-1-1; idx < newBlocks.length; ++idx, --j)
-                sceneBlocks[numRows-1][j] = newBlocks[idx];
+            for(var i = 0; idx < cNumRows; ++idx, ++i)
+                sceneBlocks[i][cNumCols-1] = newBlocks[idx];
+            for(var j = cNumCols-1-1; idx < newBlocks.length; ++idx, --j)
+                sceneBlocks[cNumRows-1][j] = newBlocks[idx];
         }
         else if (deltaCol > 0 && deltaRow < 0)
         {
             // Append new column and new row, remove leftmost column and bottom row
             Log("MOVING RIGHT AND UP");
             var pos = new float3(TopCenterBlock().aabb.minPoint);
-            //pos.x += deltaCol * blockWidth;
-            pos.z += deltaRow * blockWidth;
+            //pos.x += deltaCol * cBlockWidth;
+            pos.z += deltaRow * cBlockWidth;
 
-            for(var j = 0, col = currentBlock.col-1; j < numCols; ++j, ++col)
+            for(var j = 0, col = currentBlock.col-1; j < cNumCols; ++j, ++col)
             {
                 newBlocks.push(InstantiateSceneBlock(pos, currentBlock.row+deltaRow, col));
-                pos.x += blockWidth;
+                pos.x += cBlockWidth;
             }
-            pos.x -= blockWidth;
-            for(var i = 0, row = currentBlock.row; i < numRows-1; ++i, ++row)  // numRows-1, the new top right is already instantiated
+            pos.x -= cBlockWidth;
+            for(var i = 0, row = currentBlock.row; i < cNumRows-1; ++i, ++row)  // cNumRows-1, the new top right is already instantiated
             {
                 newBlocks.push(InstantiateSceneBlock(pos, row, currentBlock.col+deltaCol)); // +1
-                pos.z += blockWidth; // backwards +z
+                pos.z += cBlockWidth; // backwards +z
             }
 
             // Gather blocks to be removed.
-            for(var i = 0; i < numRows; ++i) // leftmost column
+            for(var i = 0; i < cNumRows; ++i) // leftmost column
                 oldBlocks.push(sceneBlocks[i][0]);
-            for(var j = 1; j < numCols; ++j) // bottom row, skip first as already handled
-                oldBlocks.push(sceneBlocks[numRows-1][j]);
+            for(var j = 1; j < cNumCols; ++j) // bottom row, skip first as already handled
+                oldBlocks.push(sceneBlocks[cNumRows-1][j]);
 
             // Re-arrange the scene block matrix: move each element left and down
-            for(var i = numRows-1; i > 0; --i)
-                for(var j = 0; j < numCols-1; ++j)
+            for(var i = cNumRows-1; i > 0; --i)
+                for(var j = 0; j < cNumCols-1; ++j)
                     sceneBlocks[i][j] = sceneBlocks[i-1][j+1];
 
             RemoveSceneBlocks(oldBlocks);
 
             // Add new blocks to the scene block matrix
             var idx = 0;
-            for(var j = 0; idx < numCols-1; ++idx, ++j)
+            for(var j = 0; idx < cNumCols-1; ++idx, ++j)
                 sceneBlocks[0][j] = newBlocks[idx];
             for(var i = 0; idx < newBlocks.length; ++idx, ++i)
-                sceneBlocks[i][numCols-1] = newBlocks[idx];
+                sceneBlocks[i][cNumCols-1] = newBlocks[idx];
         }
         else if (deltaCol < 0 && deltaRow > 0)
         {
@@ -567,41 +567,41 @@ function Update(frameTime)
             Log("MOVING LEFT AND DOWN");
 
             var pos = new float3(BottomCenterBlock().aabb.minPoint);
-            pos.z += blockWidth;
+            pos.z += cBlockWidth;
             
             // instantiate new bottom row from right to left
-            for(var j = 0, col = currentBlock.col+1; j < numCols; ++j, --col)
+            for(var j = 0, col = currentBlock.col+1; j < cNumCols; ++j, --col)
             {
                 newBlocks.push(InstantiateSceneBlock(pos, BottomCenterBlock().row+deltaRow, col));
-                pos.x -= blockWidth;
+                pos.x -= cBlockWidth;
             }
-            pos.x += blockWidth;
-            pos.z -= blockWidth;
+            pos.x += cBlockWidth;
+            pos.z -= cBlockWidth;
             // instantiate new leftmost column from down to up
-            for(var i = 0, row = currentBlock.row; i < numRows-1; ++i, --row) // numCols-1 as bottom left already instantiated
+            for(var i = 0, row = currentBlock.row; i < cNumRows-1; ++i, --row) // cNumCols-1 as bottom left already instantiated
             {
                 newBlocks.push(InstantiateSceneBlock(pos, row, currentBlock.col-1));
-                pos.z -= blockWidth;
+                pos.z -= cBlockWidth;
             }
 
             // Gather blocks to be removed.
-            for(var j = 0; j < numRows; ++j) // top row
+            for(var j = 0; j < cNumRows; ++j) // top row
                 oldBlocks.push(sceneBlocks[0][j]);
-            for(var i = 1; i < numCols; ++i)  // rightmost column
-                oldBlocks.push(sceneBlocks[i][numCols-1]);
+            for(var i = 1; i < cNumCols; ++i)  // rightmost column
+                oldBlocks.push(sceneBlocks[i][cNumCols-1]);
 
             // Re-arrange the scene block matrix: Move each element right and up
-            for(var i = 0; i < numRows-1; ++i)
-                for(var j = 0; j < numCols-1; ++j)
+            for(var i = 0; i < cNumRows-1; ++i)
+                for(var j = 0; j < cNumCols-1; ++j)
                     sceneBlocks[i][j+1] = sceneBlocks[i+1][j];
 
             RemoveSceneBlocks(oldBlocks);
 
             // Insert new blocks.
             var idx = 0;
-            for(var j = numCols-1; j >= 0; --j)
-                sceneBlocks[numRows-1][j] = newBlocks[idx++];
-            for(var i = numRows-1-1; i >= 0; --i)
+            for(var j = cNumCols-1; j >= 0; --j)
+                sceneBlocks[cNumRows-1][j] = newBlocks[idx++];
+            for(var i = cNumRows-1-1; i >= 0; --i)
                 sceneBlocks[i][0] = newBlocks[idx++];
         }
         else if (deltaCol < 0 && deltaRow < 0)
@@ -610,41 +610,41 @@ function Update(frameTime)
             Log("MOVING LEFT AND UP");
             
             var pos = new float3(CenterLeftBlock().aabb.minPoint);
-            pos.x += deltaCol * blockWidth;
+            pos.x += deltaCol * cBlockWidth;
 
             // Add new leftmost column
-            for(var i = 0, row = CenterLeftBlock().row; i < numRows; ++i, --row)
+            for(var i = 0, row = CenterLeftBlock().row; i < cNumRows; ++i, --row)
             {
                 newBlocks.push(InstantiateSceneBlock(pos, row, currentBlock.col+deltaCol));
-                pos.z -= blockWidth;
+                pos.z -= cBlockWidth;
             }
             // Add new top row, skip top left, already instantiated
-            pos.z += blockWidth;
-            pos.x += blockWidth;
-            for(var j = 0, col = currentBlock.col+deltaCol+1; j < numCols-1; ++j, ++col)
+            pos.z += cBlockWidth;
+            pos.x += cBlockWidth;
+            for(var j = 0, col = currentBlock.col+deltaCol+1; j < cNumCols-1; ++j, ++col)
             {
                 newBlocks.push(InstantiateSceneBlock(pos, currentBlock.row+deltaRow, col));
-                pos.x += blockWidth;
+                pos.x += cBlockWidth;
             }
 
             // Gather blocks to be removed
-            for(var j = 0; j < numCols; ++j) // bottom row
-                oldBlocks.push(sceneBlocks[numRows-1][j]);
-            for(var i = 0; i < numRows-1; ++i) // rightmost column
-                oldBlocks.push(sceneBlocks[i][numCols-1]);
+            for(var j = 0; j < cNumCols; ++j) // bottom row
+                oldBlocks.push(sceneBlocks[cNumRows-1][j]);
+            for(var i = 0; i < cNumRows-1; ++i) // rightmost column
+                oldBlocks.push(sceneBlocks[i][cNumCols-1]);
 
             // Re-arrange the scene block matrix: move each right and down
-            for(var i = numRows-1; i > 0; --i)
-                for(var j = 0; j < numCols-1; ++j)
+            for(var i = cNumRows-1; i > 0; --i)
+                for(var j = 0; j < cNumCols-1; ++j)
                     sceneBlocks[i][j+1] = sceneBlocks[i-1][j];
 
             RemoveSceneBlocks(oldBlocks);
 
             // Insert new blocks.
             var idx = 0;
-            for(var i = numRows-1; i >= 0; --i)
+            for(var i = cNumRows-1; i >= 0; --i)
                 sceneBlocks[i][0] = newBlocks[idx++];
-            for(var j = 1; j < numCols; ++j)
+            for(var j = 1; j < cNumCols; ++j)
                 sceneBlocks[0][j] = newBlocks[idx++];
         }
         else
@@ -681,8 +681,8 @@ function ServerPhysicsUpdate(frameTime)
     
     profiler.BeginBlock("InfiniteWorld_ServerPhysicsUpdate");
 
-    for(var i = 0; i < numRows; ++i)
-        for(var j = 0; j < numCols; ++j)
+    for(var i = 0; i < cNumRows; ++i)
+        for(var j = 0; j < cNumCols; ++j)
         {
             var block = sceneBlocks[i][j];
             for(var k = 0; k < block.bots.length; ++k)
