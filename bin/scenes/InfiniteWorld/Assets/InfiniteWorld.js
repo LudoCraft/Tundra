@@ -217,6 +217,7 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
         var bot = scene.LoadSceneXML(botPrefab, false, false, 0)[0];
         var randomPos = aabb.PointInside(Math.random(), 0.01, Math.random());
         bot.placeable.SetPosition(randomPos);
+        bot.mesh.SetAdjustScale(float3.FromScalar(10 * Math.random()));
         InitWaypoints(bot);
         bots.push(bot);
     }
