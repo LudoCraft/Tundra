@@ -35,7 +35,7 @@ var usePhysicsMotor = true;
 function SetPhysicsMotorEnabled(params)
 {
     usePhysicsMotor = ParseBool(params[0]);
-    Log("usePhysicsMotor " + syncmanager.interesetManagementEnabled);
+    Log("usePhysicsMotor " + usePhysicsMotor);
 }
 
 // Logging shortcuts
@@ -210,7 +210,7 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
     var aabb = new AABB(pos, new float3(pos.x + cBlockWidth, cBlockHeight, pos.z + cBlockWidth));
 //    var botPrefab = asset.GetAsset("FireEaterBot.txml").DiskSource();
     var botPrefab = asset.GetAsset("WaypointBot.txml").DiskSource();
-    const numBots = 6;
+    const numBots = 24;
     var bots = [];
     for(i = 0; i < numBots; ++i)
     {
@@ -666,19 +666,31 @@ function Update(frameTime)
 
 function InitWaypoints(/*Entity*/ bot)
 {
-    if (usePhysicsMotor)
-        bot.physicsmotor.dampingForce = new float3(3.0, 0.0, 3.0); // TODO Randomize?
-    bot.waypoints = [new float3(10, 0, 10), new float3(-10, 0, 10), new float3(-10, 0, -10), new float3(10, 0, -10)]; // TODO Randomize?
+    // Set in TXML already
+//    if (usePhysicsMotor)
+//        bot.physicsmotor.dampingForce = new float3(3.0, 0.0, 3.0);
+    bot.waypoints = [new float3(10, 0, 10), new float3(-10, 0, 10), new float3(-10, 0, -10), new float3(10, 0, -10)];
     bot.currentWaypoint = 0;
     for(var i = 0; i < bot.waypoints.length; ++i)
+    {
+        bot.waypoints[i] = bot.waypoints[i].Mul(Math.random());
         bot.waypoints[i] = bot.waypoints[i].Add(bot.placeable.WorldPosition());
+    }
 }
+
+var physicsTimer = 0;
+var physicsCheckInterval = 0.5; // in seconds
 
 function ServerPhysicsUpdate(frameTime)
 {
     if (!currentBlock)
         return;
-    
+
+    physicsTimer += frameTime;
+    if (physicsTimer < physicsCheckInterval)
+        return;
+    physicsTimer = 0;
+
     profiler.BeginBlock("InfiniteWorld_ServerPhysicsUpdate");
 
     for(var i = 0; i < cNumRows; ++i)

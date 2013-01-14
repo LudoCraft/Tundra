@@ -2409,6 +2409,8 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
     if (!entityState || !entity)
         return; // we (might) end up here e.g. when entity was just deleted
 
+    PROFILE(SyncManager_ComputePriorityForEntitySyncState);
+
     boost::shared_ptr<EC_Placeable> placeable = entity->GetComponent<EC_Placeable>();
     boost::shared_ptr<EC_Mesh> mesh = entity->GetComponent<EC_Mesh>();
     boost::shared_ptr<EC_RigidBody> rigidBody = entity->GetComponent<EC_RigidBody>();
@@ -2451,6 +2453,8 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
         {
             // EC_Mesh::WorldOBB not usable in headless mode (no Ogre::Entity available),
             // so we must dig the bounding volume information from OgreMeshAsset (Ogre::Mesh) instead.
+            /// @todo For some meshes (f.ex. floor of the Avatar scene) there seems to be significant disperancy
+            // between the OBB values when running as headless or not. Investigate.
             Ogre::MeshPtr ogreMesh = mesh->MeshAsset() ? mesh->MeshAsset()->ogreMesh : Ogre::MeshPtr();
             if (ogreMesh.isNull())
                 LogWarning("SyncManager::ComputePriorityForEntitySyncState: Ogre mesh null for " + mesh->GetMeshName());
