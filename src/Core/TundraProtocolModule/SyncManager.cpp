@@ -2409,8 +2409,6 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
     if (!entityState || !entity)
         return; // we (might) end up here e.g. when entity was just deleted
 
-    PROFILE(SyncManager_ComputePriorityForEntitySyncState);
-
     boost::shared_ptr<EC_Placeable> placeable = entity->GetComponent<EC_Placeable>();
     boost::shared_ptr<EC_Mesh> mesh = entity->GetComponent<EC_Mesh>();
     boost::shared_ptr<EC_RigidBody> rigidBody = entity->GetComponent<EC_RigidBody>();
@@ -2480,6 +2478,7 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
 
 void SyncManager::ComputePrioritiesForEntitySyncStates(SceneSyncState *sceneState) const
 {
+    PROFILE(SyncManager_ComputePrioritiesForEntitySyncStates);
     for(std::map<entity_id_t, EntitySyncState>::iterator it = sceneState->entities.begin(); it != sceneState->entities.end(); ++it)
         ComputePriorityForEntitySyncState(sceneState, &(*it).second, 0);
 }

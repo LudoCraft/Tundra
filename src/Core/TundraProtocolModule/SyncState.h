@@ -162,7 +162,8 @@ struct EntitySyncState
 
     /// Computes prioritized network update interval in seconds.
     /*  @remark Interest management */
-    float ComputePrioritizedUpdateInterval(float maxUpdateRate) const { return Clamp(maxUpdateRate / FinalPriority(), maxUpdateRate, minUpdateRate); }
+//    float ComputePrioritizedUpdateInterval(float maxUpdateRate) const { return Clamp(maxUpdateRate / FinalPriority(), maxUpdateRate, minUpdateRate); }
+    float ComputePrioritizedUpdateInterval(float maxUpdateRate) const { return Clamp(maxUpdateRate * Log2(100.f / FinalPriority()), maxUpdateRate, minUpdateRate); }
 
     /// Returns final/combined priority of this sync state.
     /*  @remark Interest management */
