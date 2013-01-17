@@ -14,7 +14,8 @@ function OnScriptDestroyed()
     if (framework.IsExiting())
         return;
     console.UnregisterCommand("setImEnabled");
-    console.UnregisterCommand("setPhysicsMotorEnabled");
+    if (server.IsRunning())
+        console.UnregisterCommand("setPhysicsMotorEnabled");
     Stop();
 }
 
@@ -45,21 +46,25 @@ function LogE(msg) { console.LogError(msg); }
 function LogD(msg) { console.LogDebug(msg); }
 
 // Entry point for the script.
+// "setImEnabled" available for both client and server
+console.RegisterCommand("setImEnabled", "Sets interest management enabled or disabled").Invoked.connect(SetInterestManagementEnabled);
 if (server.IsRunning())
 {
-    console.RegisterCommand("setImEnabled", "Sets interest management enabled or disabled").Invoked.connect(SetInterestManagementEnabled);
     console.RegisterCommand("setPhysicsMotorEnabled", "Sets usage of PhysicsMotor enabled or disabled").Invoked.connect(SetPhysicsMotorEnabled);
 
     // cNumRows and cNumCols must be uneven and >= 3: 3,5,7,9,...
-    const cNumRows = cNumCols = 3;
+    const cNumRows = cNumCols = 7;
 
     // Start point of the scene block matrix.
     const cStartPos = new float3(0, 0, 0);
-    // NOTE: cNumPatches configurable only if .ntf is also re-authored.
-    const cNumPatches = 8;
-    const cBlockWidth = 16 * cNumPatches - 1;
+    // NOTE: Use the following if using Terrain component.
+    // cNumPatches configurable only if .ntf is also re-authored.
+//    const cNumPatches = 8;
+//    const cBlockWidth = 16 * cNumPatches - 1;
+    const cBlockWidth = 128;
     const cBlockHeight = 128;
-
+    const cNumBotsPerBlock = 3;
+    
     // Init the scene block matrix
     var sceneBlocks = new Array(cNumRows);
     for(var i = 0; i < cNumRows; ++i)
@@ -109,6 +114,7 @@ function Start()
         HandleUserConnected(users[0].id, users[0]);
 
     frame.Updated.connect(Update)
+    Log("Total of " + (cNumBotsPerBlock * cNumCols * cNumRows) + " bots running.");
 }
 
 function Stop()
@@ -184,8 +190,9 @@ function SceneBlockAt(pos)
 
 function InstantiateSceneBlock(pos, rowIdx, colIdx)
 {
+    var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrainFlatSimple.txml").DiskSource();    
     // Flat terrain
-    var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrainFlat.txml").DiskSource();
+    //var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrainFlat.txml").DiskSource();
     // Terrain
     //var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrain.txml").DiskSource();
     // Terrain + 1 FireEater:
@@ -200,9 +207,14 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
     }
 
     // Set up terrain
+    /*
     var t = entities[0].terrain.nodeTransformation;
-    t.pos = pos;
+    var terrainPos = t.pos = pos;
     entities[0].terrain.nodeTransformation = t;
+    */
+    var t = entities[0].placeable.transform;
+    var terrainPos = t.pos = pos;
+    entities[0].placeable.transform = t;
     var blockName = rowIdx.toString() + "," + colIdx.toString()
     entities[0].name = "Terrain" + blockName;
 
@@ -210,9 +222,8 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
     var aabb = new AABB(pos, new float3(pos.x + cBlockWidth, cBlockHeight, pos.z + cBlockWidth));
 //    var botPrefab = asset.GetAsset("FireEaterBot.txml").DiskSource();
     var botPrefab = asset.GetAsset("WaypointBot.txml").DiskSource();
-    const numBots = 24;
     var bots = [];
-    for(i = 0; i < numBots; ++i)
+    for(i = 0; i < cNumBotsPerBlock; ++i)
     {
         var bot = scene.LoadSceneXML(botPrefab, false, false, 0)[0];
         var randomPos = aabb.PointInside(Math.random(), 0.01, Math.random());
@@ -244,7 +255,7 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
     newBlock.entities = entities.concat(bots);
     newBlock.bots = bots;
 
-    Log("Scene block " + newBlock + " instantiated at " + entities[0].terrain.nodeTransformation.pos);
+    Log("Scene block " + newBlock + " instantiated at " + terrainPos);
 
     return newBlock;
 }
