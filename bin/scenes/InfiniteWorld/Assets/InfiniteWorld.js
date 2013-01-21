@@ -2,12 +2,10 @@
 
     InfiniteWorld.js - A demo/testbed scene for profiling bottlenecks when dealing with a large world.  */
 
+// !ref: SceneBlockOnlyTerrainFlatSimple.txml
 // !ref: SceneBlockOnlyTerrainFlat.txml
 // !ref: SceneBlockOnlyTerrain.txml
-// !ref: SceneBlockOneNpc.txml
-// !ref: SceneBlockMultipleNpcs.txml
 // !ref: WaypointBot.txml
-// !ref: FireEaterBot.txml
 
 function OnScriptDestroyed()
 {
