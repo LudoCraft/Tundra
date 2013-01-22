@@ -7,6 +7,8 @@
 // !ref: SceneBlockOnlyTerrain.txml
 // !ref: WaypointBot.txml
 
+engine.IncludeFile("String.js");
+
 function OnScriptDestroyed()
 {
     if (framework.IsExiting())
@@ -15,12 +17,6 @@ function OnScriptDestroyed()
     if (server.IsRunning())
         console.UnregisterCommand("setPhysicsMotorEnabled");
     Stop();
-}
-
-function ParseBool(str)
-{
-    str = str.trim().toLowerCase();
-    return (str == "true" || str == "yes" || str == "1" || str == "y" || str == "on") ? true : false;
 }
 
 function SetInterestManagementEnabled(params)

@@ -19,12 +19,29 @@ var dirChangeFreq = 4; // seconds
 var move = false;
 var rotate = false;
 var scale = false;
+const cInputContextName = "EntityMoveTest";
+
+engine.IncludeFile("String.js");
 
 function OnScriptDestroyed()
 {
-    DeleteBoxes();
-    if (!framework.IsHeadless())
-        input.UnregisterInputContextRaw("EntityMoveTest");
+    if (framework.IsExiting())
+        return;
+
+    if (server.IsRunning())
+    {
+        DeleteBoxes();
+        if (!framework.IsHeadless())
+            input.UnregisterInputContextRaw(cInputContextName);
+
+        console.UnregisterCommand("setNumRows");
+        console.UnregisterCommand("setNumCols");
+        console.UnregisterCommand("setMoving");
+        console.UnregisterCommand("setRotating");
+        console.UnregisterCommand("setScaling");
+        console.UnregisterCommand("increaseSpeed");
+        console.UnregisterCommand("decreaseSpeed");
+    }
 }
 
 // Entry point for the script.
@@ -35,38 +52,89 @@ if (server.IsAboutToStart())
     CreateBoxes();
     frame.Updated.connect(Update);
 
-    if (framework.IsHeadless())
+    if (!framework.IsHeadless())
     {
-        // For now, enable only movement on headless servers.
-        move = true;
-    }
-    else
-    {
-        var inputContext = input.RegisterInputContextRaw("EntityMoveTest", 90);
+        var inputContext = input.RegisterInputContextRaw(cInputContextName, 90);
         inputContext.KeyPressed.connect(HandleKeyPressed);
     }
+
+    console.RegisterCommand("setNumRows", "EntityMoveTest: Sets number of rows.").Invoked.connect(function(params)
+    {
+         numRows = parseInt(params[0]);
+         DeleteBoxes();
+         CreateBoxes();
+    });
+    console.RegisterCommand("setNumCols", "EntityMoveTest: Sets number of columns.").Invoked.connect(function(params)
+    {
+        numCols = parseInt(params[0]);
+        console.LogInfo("numCols " + numCols);
+        DeleteBoxes();
+        CreateBoxes();
+    });
+    console.RegisterCommand("setMoving", "EntityMoveTest: Enabled/disables movement of objects.").Invoked.connect(function(params)
+    {
+        move = ParseBool(params[0]);
+    });
+    console.RegisterCommand("setRotating", "EntityMoveTest: Enabled/disables rotation of objects.").Invoked.connect(function(params)
+    {
+        rotate = ParseBool(params[0]);
+    });
+    console.RegisterCommand("setScaling", "EntityMoveTest: Enabled/disables scaling of objects.").Invoked.connect(function(params)
+    {
+        scale  = ParseBool(params[0]);
+    });
+    console.RegisterCommand("increaseSpeed", "EntityMoveTest: Increases speed.").Invoked.connect(function(params)
+    {
+        IncreaseSpeed();
+    });
+    console.RegisterCommand("decreaseSpeed", "EntityMoveTest: Decreases speed.").Invoked.connect(function(params)
+    {
+        DecreaseSpeed();
+    });
+}
+else
+{
+    syncmanager.observer = scene.EntityByName("FreeLookCamera");
+    console.LogInfo(syncmanager.observer);
+}
+
+function IncreaseSpeed()
+{
+    dirChangeFreq += 0.25;
+}
+
+function Decreasepeed()
+{
+    dirChangeFreq -= 0.25;
+    if (dirChangeFreq < 0.25)
+        dirChangeFreq = 0.25;
 }
 
 function HandleKeyPressed(e)
 {
     if (e.HasCtrlModifier())
     {
-        if (e.keyCode == Qt.Key_1)
-            move = !move;
-        if (e.keyCode == Qt.Key_2)
-            rotate = !rotate;
-        if (e.keyCode == Qt.Key_3)
-            scale = !scale;
-        if (e.keyCode == Qt.Key_R)
-            Reset();
-        if (e.keyCode == Qt.Key_Plus)
+        switch(e.keyCode)
         {
-            dirChangeFreq -= 0.25;
-            if (dirChangeFreq < 0.25)
-                dirChangeFreq = 0.25;
+        case Qt.Key_1:
+            move = !move;
+            break;
+        case Qt.Key_2:
+            rotate = !rotate;
+            break;
+        case Qt.Key_3:
+            scale = !scale;
+            break;
+        case Qt.Key_R:
+            Reset();
+            break;
+        case Qt.Key_Plus:
+            IncreaseSpeed();
+            break;
+        case Qt.Key_Minus:
+            Decreasepeed();
+            break;
         }
-        if (e.keyCode == Qt.Key_Minus)
-            dirChangeFreq += 0.25;
     }
 }
 
@@ -75,13 +143,17 @@ function DeleteBoxes()
     for(var i = 0; i < boxes.length; ++i)
         try
         {
-            scene.RemoveEntity(boxes[i].id);
+            var id = boxes[i].id;
+            boxes[i] = null;
+            scene.RemoveEntity(id);
         }
         catch(e)
         {
             // We end up here when quitting the app.
-            //console.LogWarning(e);
+            console.LogWarning(e);
         }
+
+    boxes = [];
 }
 
 function CreateBoxes()
