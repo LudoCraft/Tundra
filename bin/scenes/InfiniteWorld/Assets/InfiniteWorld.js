@@ -6,6 +6,7 @@
 // !ref: SceneBlockOnlyTerrainFlat.txml
 // !ref: SceneBlockOnlyTerrain.txml
 // !ref: WaypointBot.txml
+// !ref: Box.txml
 
 engine.IncludeFile("String.js");
 
@@ -58,6 +59,7 @@ if (server.IsRunning())
     const cBlockWidth = 128;
     const cBlockHeight = 128;
     const cNumBotsPerBlock = 3;
+    const cNumBoxesPerBlock = 3;
     
     // Init the scene block matrix
     var sceneBlocks = new Array(cNumRows);
@@ -90,6 +92,9 @@ function SceneBlock(name, row, col, pos)
     this.pos = pos;
     this.entities = [];
     this.bots = [];
+    this.boxes = [];
+    this.startPositions = [];
+    this.destinationPositions = [];
     this.aabb = new AABB(pos, new float3(pos.x + cBlockWidth, cBlockHeight, pos.z + cBlockWidth));
 }
 
@@ -184,72 +189,75 @@ function SceneBlockAt(pos)
 
 function InstantiateSceneBlock(pos, rowIdx, colIdx)
 {
-    var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrainFlatSimple.txml").DiskSource();    
+    var sceneBlockFileName = asset.GetAsset("SceneBlockOnlyTerrainFlatSimple.txml").DiskSource();    
     // Flat terrain
-    //var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrainFlat.txml").DiskSource();
+    //var sceneBlockFileName = asset.GetAsset("SceneBlockOnlyTerrainFlat.txml").DiskSource();
     // Terrain
-    //var sceneBlockFile = asset.GetAsset("SceneBlockOnlyTerrain.txml").DiskSource();
+    //var sceneBlockFileName = asset.GetAsset("SceneBlockOnlyTerrain.txml").DiskSource();
     // Terrain + 1 FireEater:
-    //var sceneBlockFile = asset.GetAsset("SceneBlockOneNpc.txml").DiskSource();
-    // Terrain + 63 FireEaters:
-    //var sceneBlockFile = asset.GetAsset("SceneBlockMultipleNpcs.txml").DiskSource();
-    var entities = scene.LoadSceneXML(sceneBlockFile, false, false, 0);
+    var entities = scene.LoadSceneXML(sceneBlockFileName, false, false, 0);
     if (entities.length == 0)
     {
-        LogE("InstantiateSceneBlock: Failed to instantiate " + sceneBlockFile);
+        LogE("InstantiateSceneBlock: Failed to te " + sceneBlockFileName);
         return;
     }
 
     // Set up terrain
-    /*
-    var t = entities[0].terrain.nodeTransformation;
-    var terrainPos = t.pos = pos;
-    entities[0].terrain.nodeTransformation = t;
-    */
-    var t = entities[0].placeable.transform;
-    var terrainPos = t.pos = pos;
-    entities[0].placeable.transform = t;
+    /*if (entities[0].terrain) // using Terrain component
+    {
+        var t = entities[0].terrain.nodeTransformation;
+        var terrainPos = t.pos = pos;
+        entities[0].terrain.nodeTransformation = t;
+    }
+    else*/ // dummy terrain
+    {
+        var t = entities[0].placeable.transform;
+        var terrainPos = t.pos = pos;
+        entities[0].placeable.transform = t;
+    }
     var blockName = rowIdx.toString() + "," + colIdx.toString()
     entities[0].name = "Terrain" + blockName;
 
-    // TODO aabb copied from SceneBlock ctor
-    var aabb = new AABB(pos, new float3(pos.x + cBlockWidth, cBlockHeight, pos.z + cBlockWidth));
-//    var botPrefab = asset.GetAsset("FireEaterBot.txml").DiskSource();
-    var botPrefab = asset.GetAsset("WaypointBot.txml").DiskSource();
+    var newBlock = new SceneBlock(blockName, rowIdx, colIdx, pos);
+
+    var botPrefabFileName = asset.GetAsset("WaypointBot.txml").DiskSource();
     var bots = [];
     for(i = 0; i < cNumBotsPerBlock; ++i)
     {
-        var bot = scene.LoadSceneXML(botPrefab, false, false, 0)[0];
-        var randomPos = aabb.PointInside(Math.random(), 0.01, Math.random());
-        bot.placeable.SetPosition(randomPos);
+        var bot = scene.LoadSceneXML(botPrefabFileName, false, false, 0)[0];
+        bot.name = "Bot" + i.toString() + " [" + blockName + "]";
+        bot.placeable.SetPosition(newBlock.aabb.PointInside(Math.random(), 0.01, Math.random()));
         bot.mesh.SetAdjustScale(float3.FromScalar(10 * Math.random()));
         InitWaypoints(bot);
         bots.push(bot);
     }
-
-    // Set up FireEaters
-    /*
-    if (entities.length > 1)
-    {
-        for(i = 1; i < entities.length; ++i)
-        {
-            var fireEaterPos = new float3(pos);
-            fireEaterPos.x += cBlockWidth/2;
-            //fireEaterPos.y += 40;
-            fireEaterPos.y = entities[0].terrain.GetPoint(pos.x, pos.z) + 1;
-            Log(fireEaterPos);
-            fireEaterPos.z += cBlockWidth/2;
-            entities[1].placeable.SetPosition(fireEaterPos);
-        }
-    }
-    */
-
-    var newBlock = new SceneBlock(blockName, rowIdx, colIdx, pos);
-    //newBlock.entities = entities;
     newBlock.entities = entities.concat(bots);
     newBlock.bots = bots;
+    
+    var boxPrefabFileName = asset.GetAsset("Box.txml").DiskSource();
+    var boxes = [];
+    for(i = 0; i < cNumBoxesPerBlock; ++i)
+    {
+        var box = scene.LoadSceneXML(boxPrefabFileName, false, false, 0)[0];
+        box.name = "Box" + i.toString() + " [" + blockName + "]";
+        var randomPos = newBlock.aabb.PointInside(Math.random(), 0.01, Math.random());
+        randomPos.y = 2;
+        box.placeable.SetPosition(randomPos);
+        box.placeable.SetScale(float3.FromScalar(10 * Math.random()));
 
-    Log("Scene block " + newBlock + " instantiated at " + terrainPos);
+        var pos = randomPos;//box.placeable.transform.pos;
+        var dest = new float3(pos);
+        dest.y = 10; //(Math.random() > 0.5) ? -2 : 2;
+        newBlock.startPositions.push(pos);
+        newBlock.destinationPositions.push(dest);
+        
+        boxes.push(box);
+    }
+    
+    newBlock.entities = entities.concat(boxes);
+    newBlock.boxes = boxes;
+
+    Log("Scene block " + newBlock.name + " instantiated at " + terrainPos);
 
     return newBlock;
 }
@@ -324,6 +332,7 @@ var timer = 0;
 var checkInterval = 2; // in seconds
 var drawDebug = false;
 
+// Runs the main logic of InfiniteWorld
 function Update(frameTime)
 {
     if (drawDebug)
@@ -333,6 +342,8 @@ function Update(frameTime)
 
     if (!userEntity)
         return;
+
+    MoveBoxes(frameTime);
 
     timer += frameTime;
     if (timer < checkInterval)
@@ -666,6 +677,45 @@ function Update(frameTime)
     }
 
     previousBlock = currentBlock;
+}
+
+//function Lerp(a, b, t) { return a*(1-t) + (b*t); }
+
+var moveTimer = 0;
+var dirChangeFreq = 4;
+
+function MoveBoxes(frameTime)
+{
+    moveTimer += frameTime;
+    if (moveTimer > dirChangeFreq)
+        moveTimer = 0;
+
+    if (!currentBlock)
+        return;
+
+    profiler.BeginBlock("EntityMoveTest.MoveBoxes");
+
+    for(var i = 0; i < cNumRows; ++i)
+        for(var j = 0; j < cNumCols; ++j)
+        {
+            var block = sceneBlocks[i][j];
+            for(var k = 0; k < block.boxes.length; ++k)
+            {
+                var box = block.boxes[k];
+                var currentPos = box.placeable.transform.pos;
+                //var dest = currentBlock.destinationPositions[i];
+                if (moveTimer == 0)
+                {
+                    block.destinationPositions[k] = block.startPositions[k];
+                    block.startPositions[k] = currentPos;
+                }
+
+                currentPos = float3.Lerp(block.startPositions[k], block.destinationPositions[k], moveTimer/dirChangeFreq);
+                box.placeable.SetPosition(currentPos);
+            }
+        }
+
+    profiler.EndBlock();
 }
 
 // Bot functionality begins here
