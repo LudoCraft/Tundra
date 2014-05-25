@@ -22,11 +22,12 @@ function OnScriptDestroyed()
 
 function SetInterestManagementEnabled(params)
 {
-    syncmanager.interesetManagementEnabled = ParseBool(params[0]);
-    Log("interestManagementEnabled " + syncmanager.interesetManagementEnabled);
+    syncmanager.interestManagementEnabled = ParseBool(params[0]);
+    Log("interestManagementEnabled " + syncmanager.interestManagementEnabled);
 }
 
 var usePhysicsMotor = true;
+var userStartBlockIdx = 0;
 
 function SetPhysicsMotorEnabled(params)
 {
@@ -109,8 +110,8 @@ function Start()
     server.UserDisconnected.connect(HandleUserDisconnected);
 
     var users = server.AuthenticatedUsers();
-    if (users.length > 0) // User already in, handle immediately
-        HandleUserConnected(users[0].id, users[0]);
+    for(var i = 0; i < users.length; ++i)
+        HandleUserConnected(users[i].id, users[i]);
 
     frame.Updated.connect(Update)
     Log("Total of " + (cNumBotsPerBlock * cNumCols * cNumRows) + " bots running.");
@@ -129,24 +130,30 @@ function Stop()
 
 function HandleUserConnected(id, user)
 {
-    // TODO
-//    if (sceneBlocks[0][0] == null)
-//        CreateWorld();
-    userEntity = scene.EntityByName("Avatar" + id);
-    if (userEntity)
+    if (!sceneBlocks[0][0])
+        CreateWorld();
+
+    var newUser = scene.EntityByName("Avatar" + id);
+    if (!userEntity)
+        userEntity = newUser;
+    if (newUser)
     {
         var userStartPos;
         // TODO: if known user, restore last known position for the user
         // else set to center of the scene
         var pos = new float3(cStartPos);
+        var idx = 0;
         for(var i = 0; i < cNumRows; ++i)
             for(var j = 0; j < cNumCols; ++j)
             {
-                var block = InstantiateSceneBlock(pos, i, j);
-                sceneBlocks[i][j] = block;
-
-                if (block == CenterBlock())
+                if (sceneBlocks[i][j] == CenterBlock())
+                // if (idx == userStartBlockIdx)
+                {
+                
                     userStartPos = new float3(pos);
+                    ++userStartBlockIdx;
+                    break;
+                }
 
                 if (j == cNumCols-1) // Reached end of the row, proceed to next
                 {
@@ -157,16 +164,19 @@ function HandleUserConnected(id, user)
                 {
                     pos.x += cBlockWidth; // right +x
                 }
+
+                ++idx;
             }
+
+        if (userStartBlockIdx >= cNumCols * cNumRows - 1)
+            userStartBlockIdx = 0;
 
         // Position user in the middle of the middle block, add some height so that we don't end up under the terrain.
         userStartPos.x += cBlockWidth/2;
         userStartPos.y += 40;
         userStartPos.z += cBlockWidth/2;
-        userEntity.placeable.SetPosition(userStartPos);
-        userEntity.placeable.SetOrientation(Quat.FromEulerZYX(0,0,0));
-
-        DebugDumpSceneBlocks();
+        newUser.placeable.SetPosition(userStartPos);
+        newUser.placeable.SetOrientation(Quat.FromEulerZYX(0,0,0));
     }
 }
 
@@ -175,6 +185,29 @@ function HandleUserDisconnected()
     userEntity = null;
     // TODO: save user's last known pos
     // TODO: freeze scene if no users
+}
+
+function CreateWorld()
+{
+    var pos = new float3(cStartPos);
+    for(var i = 0; i < cNumRows; ++i)
+        for(var j = 0; j < cNumCols; ++j)
+        {
+            var block = InstantiateSceneBlock(pos, i, j);
+            sceneBlocks[i][j] = block;
+
+            if (j == cNumCols-1) // Reached end of the row, proceed to next
+            {
+                pos.x = cStartPos.x;
+                pos.z += cBlockWidth; // backwards +z
+            }
+            else // Proceed with the row.
+            {
+                pos.x += cBlockWidth; // right +x
+            }
+        }
+
+    DebugDumpSceneBlocks();
 }
 
 // Finds the scene block at specified world position
@@ -217,7 +250,11 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
     }
     var blockName = rowIdx.toString() + "," + colIdx.toString()
     entities[0].name = "Terrain" + blockName;
-
+    var t = entities[0].placeable.transform;
+    t.scale.x = cBlockWidth;
+    t.scale.z = cBlockHeight;
+    entities[0].placeable.transform = t;
+    
     var newBlock = new SceneBlock(blockName, rowIdx, colIdx, pos);
 
     var botPrefabFileName = asset.GetAsset("WaypointBot.txml").DiskSource();
@@ -227,7 +264,8 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
         var bot = scene.LoadSceneXML(botPrefabFileName, false, false, 0)[0];
         bot.name = "Bot" + i.toString() + " [" + blockName + "]";
         bot.placeable.SetPosition(newBlock.aabb.PointInside(Math.random(), 0.01, Math.random()));
-        bot.mesh.SetAdjustScale(float3.FromScalar(10 * Math.random()));
+        // NOTE Keep scale constant due to the measurements.
+        //bot.mesh.SetAdjustScale(float3.FromScalar(10 * Math.random()));
         InitWaypoints(bot);
         bots.push(bot);
     }
