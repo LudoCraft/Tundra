@@ -173,6 +173,7 @@ private:
     SceneWeakPtr scene_; ///< Scene that is being synced.
     float updatePeriod_; ///< Time period for update (seconds), by default 1/20th of a second
     float updateAcc_; ///< Time accumulator for update
+    float prioUpdateAcc_; /**< Time accumulator for priority update @remark Interest management */
     float maxLinExtrapTime_; ///< Physics client interpolation/extrapolation period length as number of network update intervals (default 3)
     bool noClientPhysicsHandoff_; ///< Disable client physics handoff -flag
     SceneSyncState serverSyncState; ///< Server sync state (client only)

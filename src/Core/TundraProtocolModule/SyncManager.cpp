@@ -101,6 +101,7 @@ SyncManager::SyncManager(TundraLogicModule* owner) :
     framework_(owner->GetFramework()),
     updatePeriod_(1.0f / 20.0f),
     updateAcc_(0.0),
+    prioUpdateAcc_(0.0),
     maxLinExtrapTime_(3.0f),
     noClientPhysicsHandoff_(false),
     interestManagementEnabled(true)
@@ -700,12 +701,12 @@ void SyncManager::Update(f64 frametime)
 
     // Check if it is yet time to perform a network update tick.
     updateAcc_ += (float)frametime;
+    prioUpdateAcc_ += (float)frametime;
     if (updateAcc_ < updatePeriod_)
         return;
-
     // If multiple updates passed, update still just once.
     updateAcc_ = fmod(updateAcc_, updatePeriod_);
-    
+
     ScenePtr scene = scene_.lock();
     if (!scene)
         return;
@@ -719,6 +720,12 @@ void SyncManager::Update(f64 frametime)
                 // First sort the dirty queue according to priority if IM enabled
                 if (interestManagementEnabled)
                 {
+                    const float prioUpdatePeriod = 1.0f; /**< @todo Make configurable. */
+                    if (prioUpdateAcc_ >= prioUpdatePeriod)
+                    {
+                        ComputePrioritiesForEntitySyncStates((*i)->syncState.get());
+                        prioUpdateAcc_ = fmod(prioUpdateAcc_, prioUpdatePeriod);
+                    }
                     PROFILE(SyncManager_Update_SortDirtyQueue);
                     (*i)->syncState->dirtyQueue.sort(EntitySyncStatePriorityLessThan);
                 }
@@ -2503,8 +2510,8 @@ void SyncManager::HandleObserverPosition(kNet::MessageConnection* source, const 
         // Save observer information always, but compute priorities only if IM enabled.
         syncState->observerPos = pos;
         syncState->observerRot = rot;
-        if (interestManagementEnabled)
-            ComputePrioritiesForEntitySyncStates(syncState);
+        //if (interestManagementEnabled)
+          //  ComputePrioritiesForEntitySyncStates(syncState);
     }
 }
 
