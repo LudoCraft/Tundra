@@ -1,4 +1,4 @@
-// !ref: firstpersonmouseicon.png
+// !ref: FpsMouseIcon.png
 
 if (!server.IsRunning() && !framework.IsHeadless())
 {
@@ -10,7 +10,7 @@ if (!server.IsRunning() && !framework.IsHeadless())
         this.isUsingLabel = useLabel;
         this.sideLength = 8;
 
-        var iconAsset = asset.GetAsset("local://firstpersonmouseicon.png");
+        var iconAsset = asset.GetAsset("local://FpsMouseIcon.png");
         if (iconAsset == null)
         {
             print("Could not find icon asset, cannot use first person mouse icon!");

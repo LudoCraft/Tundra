@@ -5,7 +5,7 @@ if (!server.IsRunning() && !framework.IsHeadless())
 {
     engine.ImportExtension("qt.core");
     engine.ImportExtension("qt.gui");
-    engine.IncludeFile("crosshair.js");
+    engine.IncludeFile("Crosshair.js");
 }
 
 // A simple walking avatar with physics & 1st/3rd person camera

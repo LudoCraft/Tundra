@@ -13,7 +13,7 @@ if (showUi)
 
     var label = new QLabel();
     label.indent = 10;
-    label.text = "This is a test";
+    label.text = "InfiniteWorld ia a testbed/demo scene for interest management.\nSee InfiniteWorld.js for configurable parameters."
     label.resize(750,350);
     label.setStyleSheet("QLabel {background-color: transparent; font-size: 16px; }");
 

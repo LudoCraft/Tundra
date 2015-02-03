@@ -255,8 +255,9 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
     var blockName = rowIdx.toString() + "," + colIdx.toString()
     entities[0].name = "Terrain" + blockName;
     var t = entities[0].placeable.transform;
-    t.scale.x = cBlockWidth;
-    t.scale.z = cBlockHeight;
+    // The following would make the flattened boxes too small.
+    // t.scale.x = cBlockWidth;
+    // t.scale.z = cBlockHeight;
     entities[0].placeable.transform = t;
     
     var newBlock = new SceneBlock(blockName, rowIdx, colIdx, pos);
@@ -798,7 +799,9 @@ function ServerPhysicsUpdate(frameTime)
             for(var k = 0; k < block.bots.length; ++k)
             {
                 var bot = block.bots[k];
-
+                // NOTE Bots could handle the movement themselves but having hundreds of script instances
+                // is uses lots of memory and bot logic is non-pertinent in the original test case.
+                // See WaypointBot.txml and WaypointBot.js if you want to enable self-moving bots.
                 var targetPos = bot.waypoints[bot.currentWaypoint];
                 TurnToSmooth(bot, ComputeTargetHeading(bot, targetPos), 0.05);
 

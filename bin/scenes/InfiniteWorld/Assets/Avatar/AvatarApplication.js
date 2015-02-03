@@ -98,11 +98,6 @@ function ServerHandleUserConnected(connectionID, user) {
     var script = avatarEntity.script;
     script.className = "AvatarApp.SimpleAvatar";
 
-    // Simpleavatar.js implements the basic avatar movement and animation.
-    // Also load an additional script object to the same entity (ExampleAvatarAddon.js) to demonstrate adding features to the avatar.
-    var script2 = avatarEntity.GetOrCreateComponent("EC_Script", "Addon", 0, true);
-    script2.className = "AvatarApp.ExampleAvatarAddon";
-
     // Set random starting position for avatar
     var placeable = avatarEntity.placeable;
     var transform = placeable.transform;
