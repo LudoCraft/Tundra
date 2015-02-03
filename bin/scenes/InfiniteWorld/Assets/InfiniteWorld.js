@@ -76,6 +76,8 @@ if (server.IsRunning())
     var currentBlock = null;
 
     scene.physics.Updated.connect(ServerPhysicsUpdate);
+
+    // NOTE Animation disabled as non-pertinent for the original test case.
 //    if (!framework.IsHeadless())
 //        frame.Updated.connect(AnimationUpdate);
 
@@ -761,8 +763,10 @@ function MoveBoxes(frameTime)
     profiler.EndBlock();
 }
 
-// Bot functionality begins here
-
+// ================ Bot functionality begins here ================ //
+// NOTE Bots could handle the movement themselves but having hundreds of script instances
+// uses lots of memory and bot logic is non-pertinent for the original test case.
+// See WaypointBot.txml and WaypointBot.js if you want to enable self-moving bots.
 function InitWaypoints(/*Entity*/ bot)
 {
     // Set in TXML already
@@ -799,9 +803,6 @@ function ServerPhysicsUpdate(frameTime)
             for(var k = 0; k < block.bots.length; ++k)
             {
                 var bot = block.bots[k];
-                // NOTE Bots could handle the movement themselves but having hundreds of script instances
-                // is uses lots of memory and bot logic is non-pertinent in the original test case.
-                // See WaypointBot.txml and WaypointBot.js if you want to enable self-moving bots.
                 var targetPos = bot.waypoints[bot.currentWaypoint];
                 TurnToSmooth(bot, ComputeTargetHeading(bot, targetPos), 0.05);
 
