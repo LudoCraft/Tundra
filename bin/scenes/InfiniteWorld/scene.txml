@@ -15,7 +15,7 @@
  </entity>
  <entity id="2" sync="1">
   <component type="EC_Script" sync="1">
-   <attribute value="AvatarApplication.js;SimpleAvatar.js;ExampleAvataraddon.js" name="Script ref"/>
+   <attribute value="AvatarApplication.js;SimpleAvatar.js" name="Script ref"/>
    <attribute value="true" name="Run on load"/>
    <attribute value="0" name="Run mode"/>
    <attribute value="AvatarApp" name="Script application name"/>
@@ -51,7 +51,6 @@
    <attribute value="5" name="Wind speed"/>
   </component>
  </entity>
- <!--
  <entity id="5" sync="1">
   <component type="EC_Name" sync="1">
    <attribute value="Instructions" name="name"/>
@@ -65,5 +64,4 @@
    <attribute value="" name="Script class name"/>
   </component>
  </entity>
- -->
 </scene>
