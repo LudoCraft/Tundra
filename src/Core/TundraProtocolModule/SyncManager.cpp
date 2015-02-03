@@ -2419,16 +2419,20 @@ void SyncManager::ComputePriorityForEntitySyncState(SceneSyncState *sceneState, 
     boost::shared_ptr<EC_Placeable> placeable = entity->GetComponent<EC_Placeable>();
     boost::shared_ptr<EC_Mesh> mesh = entity->GetComponent<EC_Mesh>();
     boost::shared_ptr<EC_RigidBody> rigidBody = entity->GetComponent<EC_RigidBody>();
-    /// @todo handle audio sources
+    /// @todo sound sources
 /*
 #ifdef EC_Sound_ENABLED
-    boost::shared_ptr<EC_Audio> audio = entity->GetComponent<EC_Audio>();
-    if (audio && audio->spatial.Get())
+    boost::shared_ptr<EC_Sound> sound = entity->GetComponent<EC_Sound>();
+    if (sound)
     {
-        /// @todo priority inf for non-spatial audio?
-        float r = audio->soundOuterRadius.Get();
-        r *= r;
-        state.priority = 4.f * pi * r / sceneState->observerPos.DistanceSq(p->WorldPosition());
+        if (sound->spatial.Get() && placeable)
+        {
+            float r = audio->soundOuterRadius.Get();
+            r *= r;
+            entityState->priority = 4.f * pi * r / sceneState->observerPos.DistanceSq(placeable->WorldPosition());
+        }
+        else
+            entityState->priority = inf;
     }
 #endif
 */

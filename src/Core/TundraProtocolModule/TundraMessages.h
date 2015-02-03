@@ -9,6 +9,7 @@ const unsigned long cClientJoinedMessage = 102;
 const unsigned long cClientLeftMessage = 103;
 
 // Scenesync
+/// @todo const unsigned long cSetObserverMessage = 108; // Server->client, tells what entity to use as the observer
 const unsigned long cObserverPositionMessage = 109; // Client->server only currently, but could be used server->client also to tell that "you are now here".
 const unsigned long cCreateEntityMessage = 110;
 const unsigned long cCreateComponentsMessage = 111;

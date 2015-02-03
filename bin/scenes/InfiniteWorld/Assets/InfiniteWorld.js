@@ -8,7 +8,25 @@
 // !ref: WaypointBot.txml
 // !ref: Box.txml
 
-engine.IncludeFile("String.js");
+// ================ Configuration ================ //
+// cNumRows and cNumCols must be uneven and >= 3: 3,5,7,9,...
+const cNumRows = cNumCols = 7;
+// Start point of the scene block matrix.
+const cStartPos = new float3(0, 0, 0);
+// NOTE: Use the following if using Terrain component.
+// cNumPatches configurable only if .ntf is also re-authored.
+//    const cNumPatches = 8;
+//    const cBlockWidth = 16 * cNumPatches - 1;
+const cBlockWidth = 128;
+const cBlockHeight = 128;
+const cNumBotsPerBlock = 3;
+const cNumBoxesPerBlock = 3;
+
+function ParseBool(str)
+{
+    str = str.trim().toLowerCase();
+    return (str == "true" || str == "yes" || str == "1" || str == "y" || str == "on");
+}
 
 function OnScriptDestroyed()
 {
@@ -47,20 +65,6 @@ console.RegisterCommand("setImEnabled", "Sets interest management enabled or dis
 if (server.IsRunning())
 {
     console.RegisterCommand("setPhysicsMotorEnabled", "Sets usage of PhysicsMotor enabled or disabled").Invoked.connect(SetPhysicsMotorEnabled);
-
-    // cNumRows and cNumCols must be uneven and >= 3: 3,5,7,9,...
-    const cNumRows = cNumCols = 7;
-
-    // Start point of the scene block matrix.
-    const cStartPos = new float3(0, 0, 0);
-    // NOTE: Use the following if using Terrain component.
-    // cNumPatches configurable only if .ntf is also re-authored.
-//    const cNumPatches = 8;
-//    const cBlockWidth = 16 * cNumPatches - 1;
-    const cBlockWidth = 128;
-    const cBlockHeight = 128;
-    const cNumBotsPerBlock = 3;
-    const cNumBoxesPerBlock = 3;
     
     // Init the scene block matrix
     var sceneBlocks = new Array(cNumRows);
@@ -231,7 +235,7 @@ function InstantiateSceneBlock(pos, rowIdx, colIdx)
     var entities = scene.LoadSceneXML(sceneBlockFileName, false, false, 0);
     if (entities.length == 0)
     {
-        LogE("InstantiateSceneBlock: Failed to te " + sceneBlockFileName);
+        LogE("InstantiateSceneBlock: Failed to create content from " + sceneBlockFileName);
         return;
     }
 

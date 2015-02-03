@@ -187,7 +187,7 @@ struct EntitySyncState
     Transform transform;
     float3 linearVelocity;
     float3 angularVelocity;
-    kNet::tick_t lastNetworkSendTime; ///< @note Shared usage by rigid body optimization and interest management.
+    kNet::tick_t lastNetworkSendTime; /**< @note Shared usage by rigid body optimization and interest management. */
 
     /// Priority = size / distance for visible entities, inf for non-visible.
     /** Larger number means larger importancy. If this value has not been yet calculated it's < 0.
@@ -279,7 +279,8 @@ private:
 /// Scene's per-user network sync state
 /* @sa ComponentSyncState, EntitySyncState */
 class TUNDRAPROTOCOL_MODULE_API SceneSyncState : public QObject
-{    Q_OBJECT
+{
+    Q_OBJECT
 
 public:
     SceneSyncState(u32 userConnectionID = 0, bool isServer = false);
